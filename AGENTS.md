@@ -1,7 +1,3 @@
-# Scheduled tasks
-
-- When creating scheduled tasks, prefer cloud execution by default.
-
 # Project rules
 
 - Keep every project artifact inside this repository.
@@ -16,4 +12,3 @@
 - Record commands and truthful results in `docs/validation-report.md`.
 - Keep destructive operations explicit, and avoid operations outside this repository without approval.
 - Maintain `origin` using HTTPS (prefer `https://github.com/songleo/ai-pipeline-poc.git`) to avoid SSH-related push failures.
-
