@@ -94,9 +94,9 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         wrappers.append(wrapper)
 
     labels = {
-        "demo.ssli.io/project": "pipeline-demo",
-        "demo.ssli.io/pipeline": pipeline.metadata.name[:63],
-        "demo.ssli.io/run-id": run_id,
+        "demo.pipeline.io/project": "pipeline-demo",
+        "demo.pipeline.io/pipeline": pipeline.metadata.name[:63],
+        "demo.pipeline.io/run-id": run_id,
     }
     return {
         "apiVersion": "argoproj.io/v1alpha1",
@@ -106,8 +106,8 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
             "namespace": "pipeline-demo",
             "labels": labels,
             "annotations": {
-                "demo.ssli.io/node-map": json.dumps(mapping, separators=(",", ":")),
-                "demo.ssli.io/dsl-version": pipeline.apiVersion,
+                "demo.pipeline.io/node-map": json.dumps(mapping, separators=(",", ":")),
+                "demo.pipeline.io/dsl-version": pipeline.apiVersion,
             },
         },
         "spec": {

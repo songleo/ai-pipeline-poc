@@ -51,7 +51,7 @@ def _pod_name_matches(pod_name: str, argo_node_id: str | None) -> bool:
 
 def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
     metadata, spec, status = workflow.get("metadata", {}), workflow.get("spec", {}), workflow.get("status", {})
-    mapping = json.loads(metadata.get("annotations", {}).get("demo.ssli.io/node-map", "{}"))
+    mapping = json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/node-map", "{}"))
     statuses: dict[str, dict[str, Any]] = status.get("nodes", {}) or {}
     result_nodes = []
     for node_id, task_name in mapping.items():
@@ -71,7 +71,7 @@ def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
         })
     return {
         "workflowName": metadata.get("name"),
-        "pipelineName": metadata.get("labels", {}).get("demo.ssli.io/pipeline"),
+        "pipelineName": metadata.get("labels", {}).get("demo.pipeline.io/pipeline"),
         "status": map_phase(status.get("phase"), status.get("message", ""), spec.get("shutdown")),
         "startedAt": status.get("startedAt"), "finishedAt": status.get("finishedAt"),
         "message": status.get("message"), "nodes": result_nodes,
@@ -95,7 +95,7 @@ class KubernetesWorkflowClient:
         return self.custom.get_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, name)
 
     def list(self) -> list[dict[str, Any]]:
-        response = self.custom.list_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, label_selector="demo.ssli.io/project=pipeline-demo")
+        response = self.custom.list_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, label_selector="demo.pipeline.io/project=pipeline-demo")
         return response.get("items", [])
 
     def stop(self, name: str) -> dict[str, Any]:

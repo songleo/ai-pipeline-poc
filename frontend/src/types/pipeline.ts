@@ -11,7 +11,7 @@ export interface NodeTypeDefinition {
 export interface PipelineNode { id: string; type: string; version: string; name?: string; parameters: Record<string, unknown> }
 export interface PipelineEdge { source: string; sourcePort: string; target: string; targetPort: string }
 export interface Pipeline {
-  apiVersion: 'demo.ssli.io/v1alpha1'; kind: 'Pipeline'; metadata: { name: string }
+  apiVersion: 'demo.pipeline.io/v1alpha1'; kind: 'Pipeline'; metadata: { name: string }
   spec: { nodes: PipelineNode[]; edges: PipelineEdge[]; runPolicy: { timeoutSeconds: number } }
   uiLayout: { nodes: Record<string, { x: number; y: number }> }
 }

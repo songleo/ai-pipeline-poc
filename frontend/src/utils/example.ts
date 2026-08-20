@@ -1,7 +1,7 @@
 import type { Pipeline } from '../types/pipeline'
 
 export const examplePipeline: Pipeline = {
-  apiVersion: 'demo.ssli.io/v1alpha1', kind: 'Pipeline', metadata: { name: 'model-comparison-demo' },
+  apiVersion: 'demo.pipeline.io/v1alpha1', kind: 'Pipeline', metadata: { name: 'model-comparison-demo' },
   spec: {
     nodes: [
       { id: 'generate', type: 'data-generator', version: '1.0.0', name: '生成数据', parameters: { sampleCount: 1000, featureCount: 10, durationSeconds: 2 } },

@@ -44,7 +44,7 @@ class UiLayout(BaseModel):
 class Pipeline(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    apiVersion: Literal["demo.ssli.io/v1alpha1"]
+    apiVersion: Literal["demo.pipeline.io/v1alpha1"]
     kind: Literal["Pipeline"]
     metadata: Metadata
     spec: PipelineSpec

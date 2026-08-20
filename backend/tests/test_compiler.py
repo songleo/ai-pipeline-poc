@@ -22,7 +22,7 @@ def test_compiles_to_structured_workflow() -> None:
     assert workflow["spec"]["serviceAccountName"] == "pipeline-demo-workflow"
     assert workflow["spec"]["activeDeadlineSeconds"] == 300
     assert workflow["metadata"]["labels"] == {
-        "demo.ssli.io/project": "pipeline-demo", "demo.ssli.io/pipeline": "model-comparison-demo", "demo.ssli.io/run-id": "goldenrun001"
+        "demo.pipeline.io/project": "pipeline-demo", "demo.pipeline.io/pipeline": "model-comparison-demo", "demo.pipeline.io/run-id": "goldenrun001"
     }
 
 

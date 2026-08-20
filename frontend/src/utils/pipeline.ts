@@ -20,7 +20,7 @@ export function pipelineToFlow(pipeline: Pipeline, registry: NodeTypeDefinition[
 
 export function flowToPipeline(name: string, nodes: Node<PipelineNodeData>[], edges: Edge[], timeoutSeconds = 300): Pipeline {
   return {
-    apiVersion: 'demo.ssli.io/v1alpha1', kind: 'Pipeline', metadata: { name },
+    apiVersion: 'demo.pipeline.io/v1alpha1', kind: 'Pipeline', metadata: { name },
     spec: {
       nodes: nodes.map(node => JSON.parse(JSON.stringify(node.data!.pipelineNode)) as PipelineNode),
       edges: edges.map(edge => ({ source: edge.source, sourcePort: edge.sourceHandle ?? '', target: edge.target, targetPort: edge.targetHandle ?? '' })),

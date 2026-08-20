@@ -2,11 +2,11 @@
 
 ## 顶层结构
 
-`apiVersion` 固定为 `demo.ssli.io/v1alpha1`，`kind` 固定为 `Pipeline`。`metadata.name` 是 DNS 风格 Pipeline 名。`spec` 是执行定义；`uiLayout` 只是编辑器坐标，Compiler 不依赖它。
+`apiVersion` 固定为 `demo.pipeline.io/v1alpha1`，`kind` 固定为 `Pipeline`。`metadata.name` 是 DNS 风格 Pipeline 名。`spec` 是执行定义；`uiLayout` 只是编辑器坐标，Compiler 不依赖它。
 
 ```json
 {
-  "apiVersion": "demo.ssli.io/v1alpha1",
+  "apiVersion": "demo.pipeline.io/v1alpha1",
   "kind": "Pipeline",
   "metadata": {"name": "model-comparison-demo"},
   "spec": {

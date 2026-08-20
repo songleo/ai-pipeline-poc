@@ -1,5 +1,5 @@
 {
-  "apiVersion": "demo.ssli.io/v1alpha1",
+  "apiVersion": "demo.pipeline.io/v1alpha1",
   "kind": "Pipeline",
   "metadata": {"name": "model-comparison-demo"},
   "spec": {

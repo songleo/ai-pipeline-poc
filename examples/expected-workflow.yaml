@@ -4,12 +4,12 @@ metadata:
   generateName: model-comparison-demo-
   namespace: pipeline-demo
   labels:
-    demo.ssli.io/project: pipeline-demo
-    demo.ssli.io/pipeline: model-comparison-demo
-    demo.ssli.io/run-id: goldenrun001
+    demo.pipeline.io/project: pipeline-demo
+    demo.pipeline.io/pipeline: model-comparison-demo
+    demo.pipeline.io/run-id: goldenrun001
   annotations:
-    demo.ssli.io/node-map: '{"generate":"generate","preprocess":"preprocess","train-a":"train-a","train-b":"train-b","compare":"compare","report":"report"}'
-    demo.ssli.io/dsl-version: demo.ssli.io/v1alpha1
+    demo.pipeline.io/node-map: '{"generate":"generate","preprocess":"preprocess","train-a":"train-a","train-b":"train-b","compare":"compare","report":"report"}'
+    demo.pipeline.io/dsl-version: demo.pipeline.io/v1alpha1
 spec:
   entrypoint: pipeline
   serviceAccountName: pipeline-demo-workflow
