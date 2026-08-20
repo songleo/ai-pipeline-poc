@@ -9,7 +9,7 @@
 - Never operate on a Kubernetes context other than `kind-pipeline-demo`.
 - Do not install system packages or integrate with `ai-platform`.
 - Commit changes only after confirming required files are in expected state and tests/validation evidence is recorded.
-- 禁止在仓库内任何代码、脚本、文档中出现 `ssli` 与 `ssli-demo` 关键字。
+- 禁止在仓库内任何代码、脚本、文档保留历史命名前缀残留。
 - Prefer a minimal demonstrable pipeline over production infrastructure.
 - Never accept arbitrary container images, shell commands, service accounts, or raw Argo YAML from users.
 - Record commands and truthful results in `docs/validation-report.md`.
