@@ -25,7 +25,7 @@ PoC 已完成真实端到端验证。Vue Flow 能支持拖拽、连线、端口�
 
 ### 2026-08-20 本轮 WSL/Kind 重新部署
 
-本轮先做实时检查，确认 WSL 工具链和 Docker 正常、5173/8000/8080/2746 端口空闲，且当时只有 `ai-platform-local` 集群、目标 `ssli-demo` 不存在。随后复用本机已有 Kind 节点镜像，只创建独立的 `ssli-demo` 集群；所有 Kubernetes 操作均显式限定到 `kind-ssli-demo`，未操作 `ai-platform-local`。
+本轮先做实时检查，确认 WSL 工具链和 Docker 正常、5173/8000/8080/2746 端口空闲，且当时只有 `ai-platform-local` 集群、目标 `pipeline-demo` 不存在。随后复用本机已有 Kind 节点镜像，只创建独立的 `pipeline-demo` 集群；所有 Kubernetes 操作均显式限定到 `kind-pipeline-demo`，未操作 `ai-platform-local`。
 
 ```bash
 bash scripts/preflight.sh
@@ -52,7 +52,7 @@ KIND_NODE_IMAGE=kindest/node@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b8
 bash scripts/install-argo.sh
 ```
 
-结果：预检退出码 0；Kind 在 21 秒达到 Ready；`kind-ssli-demo` 节点 Ready；Argo controller/server 均 `1/1 Running`。改进后的安装脚本重复执行成功，chart SHA 校验 `OK`，Helm release revision 2、状态 `deployed`、app version `v4.0.8`。部署后再次运行预检时，项目 PID 文件和进程命令行校验能把 5173、8000、2746 识别为 `OWNED`，不再误报为外部端口冲突。
+结果：预检退出码 0；Kind 在 21 秒达到 Ready；`kind-pipeline-demo` 节点 Ready；Argo controller/server 均 `1/1 Running`。改进后的安装脚本重复执行成功，chart SHA 校验 `OK`，Helm release revision 2、状态 `deployed`、app version `v4.0.8`。部署后再次运行预检时，项目 PID 文件和进程命令行校验能把 5173、8000、2746 识别为 `OWNED`，不再误报为外部端口冲突。
 
 ### 单元测试和构建
 
@@ -100,7 +100,7 @@ logs, output, fixed failure retries, and manual stop.
 
 ### 删除集群后的全新部署复测
 
-2026-08-20 再次执行 `make clean`，确认删除 `ssli-demo-control-plane` 后，从零创建 Kind、首次安装 Argo、构建并加载应用镜像、创建 Namespace/RBAC/WorkflowTemplate/Deployment，再运行完整 smoke。Kind 控制面 19 秒 Ready；Argo release revision 1、controller/server 均 `1/1`；前后端 Deployment 均 `1/1`。
+2026-08-20 再次执行 `make clean`，确认删除 `pipeline-demo-control-plane` 后，从零创建 Kind、首次安装 Argo、构建并加载应用镜像、创建 Namespace/RBAC/WorkflowTemplate/Deployment，再运行完整 smoke。Kind 控制面 19 秒 Ready；Argo release revision 1、controller/server 均 `1/1`；前后端 Deployment 均 `1/1`。
 
 全新集群 smoke 退出码 0、用时 `136.5s`：成功 Workflow `model-comparison-demo-22l69` 为 `Succeeded`；固定失败重试 Workflow `model-comparison-demo-2zncj` 为预期 `Failed`；停止 Workflow `model-comparison-demo-jv5cz` 最终为 `Failed / shutdown=Terminate`，后端返回 `CANCELLED`。并行区间、日志和最终输出断言全部通过。
 
@@ -135,3 +135,4 @@ logs, output, fixed failure retries, and manual stop.
 ## 技术建议
 
 建议继续使用 Vue Flow + Argo。可复用边界是 DSL、Registry schema、校验器、Compiler 分层、状态模型、固定模板白名单和 API 契约；模拟脚本、单 Namespace、localStorage、端口转发和当前 RBAC/镜像布局只能作为演示实现。接入 ai-platform 前必须扫描其当前训练/评测/模型 API、鉴权、Namespace、配额、幂等和停止语义。
+

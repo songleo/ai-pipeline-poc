@@ -4,7 +4,7 @@ metadata:
   name: pipeline-demo-nodes
   namespace: pipeline-demo
   labels:
-    app.kubernetes.io/part-of: ssli-demo
+    app.kubernetes.io/part-of: pipeline-demo
 spec:
   templates:
     - name: generate-data
@@ -15,7 +15,7 @@ spec:
           - name: feature-count
           - name: duration-seconds
       container:
-        image: ssli-demo-backend:0.1.0
+        image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
@@ -36,7 +36,7 @@ spec:
           - name: clean-ratio
           - name: duration-seconds
       container:
-        image: ssli-demo-backend:0.1.0
+        image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
@@ -59,7 +59,7 @@ spec:
           - name: accuracy
           - name: fail-mode
       container:
-        image: ssli-demo-backend:0.1.0
+        image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
@@ -81,7 +81,7 @@ spec:
           - name: model-a
           - name: model-b
       container:
-        image: ssli-demo-backend:0.1.0
+        image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
@@ -98,7 +98,7 @@ spec:
           - name: node-id
           - name: model
       container:
-        image: ssli-demo-backend:0.1.0
+        image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
@@ -109,3 +109,4 @@ spec:
         parameters:
           - name: report
             valueFrom: {path: /tmp/report.json}
+

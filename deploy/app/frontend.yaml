@@ -9,11 +9,11 @@ spec:
     matchLabels: {app: pipeline-demo-frontend}
   template:
     metadata:
-      labels: {app: pipeline-demo-frontend, app.kubernetes.io/part-of: ssli-demo}
+      labels: {app: pipeline-demo-frontend, app.kubernetes.io/part-of: pipeline-demo}
     spec:
       containers:
         - name: frontend
-          image: ssli-demo-frontend:0.1.0
+          image: pipeline-demo-frontend:0.1.0
           imagePullPolicy: IfNotPresent
           ports: [{name: http, containerPort: 8080}]
           readinessProbe:
@@ -29,3 +29,4 @@ metadata:
 spec:
   selector: {app: pipeline-demo-frontend}
   ports: [{name: http, port: 8080, targetPort: http}]
+

@@ -21,7 +21,8 @@ smoke:
 
 test:
 	cd backend && PYTHONPATH=.:.deps python3 -m pytest
-	docker build --provenance=false --target test --build-arg "NPM_REGISTRY=$${NPM_REGISTRY:-https://registry.npmmirror.com}" -t ssli-demo-frontend-test:0.1.0 frontend
+	docker build --provenance=false --target test --build-arg "NPM_REGISTRY=$${NPM_REGISTRY:-https://registry.npmmirror.com}" -t pipeline-demo-frontend-test:0.1.0 frontend
 
 clean:
 	bash scripts/cleanup.sh
+

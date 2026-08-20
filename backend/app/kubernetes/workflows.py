@@ -84,7 +84,7 @@ class KubernetesWorkflowClient:
         try:
             config.load_incluster_config()
         except config.ConfigException:
-            config.load_kube_config(context=os.getenv("KUBERNETES_CONTEXT", "kind-ssli-demo"))
+            config.load_kube_config(context=os.getenv("KUBERNETES_CONTEXT", "kind-pipeline-demo"))
         self.custom = client.CustomObjectsApi()
         self.core = client.CoreV1Api()
 
@@ -95,7 +95,7 @@ class KubernetesWorkflowClient:
         return self.custom.get_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, name)
 
     def list(self) -> list[dict[str, Any]]:
-        response = self.custom.list_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, label_selector="demo.ssli.io/project=ssli-demo")
+        response = self.custom.list_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, label_selector="demo.ssli.io/project=pipeline-demo")
         return response.get("items", [])
 
     def stop(self, name: str) -> dict[str, Any]:
@@ -119,3 +119,4 @@ class KubernetesWorkflowClient:
 
 
 __all__ = ["ApiException", "KubernetesWorkflowClient", "map_phase", "workflow_detail"]
+

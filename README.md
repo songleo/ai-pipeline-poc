@@ -1,6 +1,6 @@
-# ssli-demo
+# pipeline-demo
 
-`ssli-demo` 是一个独立的可视化 AI Pipeline PoC，用最小闭环验证 Vue Flow 编辑 DAG、自定义 JSON DSL、FastAPI Compiler、Argo Workflows 执行，以及状态、日志和输出回传。它不接入 `ai-platform`，也不允许浏览器直接访问 Kubernetes。
+`pipeline-demo` 是一个独立的可视化 AI Pipeline PoC，用最小闭环验证 Vue Flow 编辑 DAG、自定义 JSON DSL、FastAPI Compiler、Argo Workflows 执行，以及状态、日志和输出回传。它不接入 `ai-platform`，也不允许浏览器直接访问 Kubernetes。
 
 ## 架构简介
 
@@ -20,7 +20,7 @@ Kubernetes 1.33 已结束支持；这里选择它仅因为它在 Argo v4.0.8 官
 
 ## 环境要求
 
-Docker、Kind、kubectl、Helm、Node.js 22.12+、npm、Python 3.12、jq 和 Bash。所有 Kubernetes 脚本只接受 context `kind-ssli-demo`；若 context 不匹配会拒绝执行。
+Docker、Kind、kubectl、Helm、Node.js 22.12+、npm、Python 3.12、jq 和 Bash。所有 Kubernetes 脚本只接受 context `kind-pipeline-demo`；若 context 不匹配会拒绝执行。
 
 ## 快速启动
 
@@ -75,14 +75,14 @@ make smoke
 make clean
 ```
 
-该命令只终止本项目记录的端口转发 PID，并删除名为 `ssli-demo` 的 Kind 集群；不会删除其他集群、目录或镜像。
+该命令只终止本项目记录的端口转发 PID，并删除名为 `pipeline-demo` 的 Kind 集群；不会删除其他集群、目录或镜像。
 
 ## 常见故障
 
-- `current context ... expected kind-ssli-demo`：脚本主动保护了其他集群；先运行 `make bootstrap`。
+- `current context ... expected kind-pipeline-demo`：脚本主动保护了其他集群；先运行 `make bootstrap`。
 - Docker 不可用：启用 Docker Desktop 的 WSL integration，再运行 `make preflight`。
 - Helm 或 Kind 缺失：从官方发行页安装锁定版本；脚本不会替你执行系统级安装。
-- Workflow 一直 Pending：检查 `kubectl --context kind-ssli-demo -n pipeline-demo get pods,workflow` 以及 Argo controller 日志。
+- Workflow 一直 Pending：检查 `kubectl --context kind-pipeline-demo -n pipeline-demo get pods,workflow` 以及 Argo controller 日志。
 - 前端无法访问 API：确认 8000 端口转发存在，并查看 `backend-port-forward.log`。
 - 模拟训练固定失败：`failMode=always` 是可靠的演示开关；改回 `never` 后再运行成功流程。
 
@@ -98,3 +98,4 @@ make clean
 - [Vue Flow v1.48.2](https://github.com/bcakmakoglu/vue-flow/releases/tag/v1.48.2)、[Vue v3.5.41](https://github.com/vuejs/core/releases/tag/v3.5.41)、[Vite v8.2.0](https://github.com/vitejs/vite/releases/tag/v8.2.0)、[Element Plus v2.14.0](https://github.com/element-plus/element-plus/releases/tag/2.14.0)
 - [Node.js v22 发布线](https://nodejs.org/en/about/previous-releases)
 - [FastAPI v0.136.3](https://github.com/fastapi/fastapi/releases/tag/0.136.3)、[Pydantic v2.13.4](https://github.com/pydantic/pydantic/releases/tag/v2.13.4)、[Kubernetes Python Client v33.1.0](https://github.com/kubernetes-client/python/releases/tag/v33.1.0)
+

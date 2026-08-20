@@ -1,5 +1,5 @@
 {
-  "name": "ssli-demo-frontend",
+  "name": "pipeline-demo-frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -26,3 +26,4 @@
     "vue-tsc": "3.1.0"
   }
 }
+

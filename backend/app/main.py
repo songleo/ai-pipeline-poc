@@ -11,7 +11,7 @@ from app.models.pipeline import Pipeline
 from app.registry import get_node_type, list_node_types
 
 
-app = FastAPI(title="ssli-demo Pipeline API", version="0.1.0")
+app = FastAPI(title="pipeline-demo Pipeline API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -114,3 +114,4 @@ def stop_run(workflow_name: str, kube: KubernetesWorkflowClient = Depends(workfl
         return kube.stop(workflow_name)
     except ApiException as exc:
         raise _kube_error(exc) from exc
+

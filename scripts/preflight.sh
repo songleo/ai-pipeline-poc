@@ -48,7 +48,7 @@ command -v python3 >/dev/null 2>&1 && python3 --version || true
 for port in 5173 8000 8080 2746; do
   if command -v ss >/dev/null 2>&1 && ss -ltn "sport = :$port" | tail -n +2 | grep -q .; then
     if owned_port_forward "$port"; then
-      echo "OWNED port $port (ssli-demo port-forward)"
+      echo "OWNED port $port (pipeline-demo port-forward)"
     else
       echo "BUSY port $port"
       status=1
@@ -58,7 +58,7 @@ for port in 5173 8000 8080 2746; do
       echo "FREE port $port"
     else
       if owned_port_forward "$port"; then
-        echo "OWNED port $port (ssli-demo port-forward)"
+        echo "OWNED port $port (pipeline-demo port-forward)"
       else
         echo "BUSY port $port"
         status=1
@@ -74,3 +74,4 @@ if (( status != 0 )); then
   echo 'Preflight failed. Resolve the MISS, BUSY, or UNKNOWN items above. No installation was attempted.'
 fi
 exit "$status"
+

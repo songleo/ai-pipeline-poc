@@ -22,7 +22,7 @@ def test_compiles_to_structured_workflow() -> None:
     assert workflow["spec"]["serviceAccountName"] == "pipeline-demo-workflow"
     assert workflow["spec"]["activeDeadlineSeconds"] == 300
     assert workflow["metadata"]["labels"] == {
-        "demo.ssli.io/project": "ssli-demo", "demo.ssli.io/pipeline": "model-comparison-demo", "demo.ssli.io/run-id": "goldenrun001"
+        "demo.ssli.io/project": "pipeline-demo", "demo.ssli.io/pipeline": "model-comparison-demo", "demo.ssli.io/run-id": "goldenrun001"
     }
 
 
@@ -64,3 +64,4 @@ def test_safe_task_name_conversion_and_collision() -> None:
     assert result["123 bad/id"].startswith("n-")
     assert all(len(value) <= 54 for value in result.values())
     assert len(set(result.values())) == 4
+

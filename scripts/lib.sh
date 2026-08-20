@@ -2,8 +2,8 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CLUSTER_NAME="ssli-demo"
-EXPECTED_CONTEXT="kind-ssli-demo"
+CLUSTER_NAME="pipeline-demo"
+EXPECTED_CONTEXT="kind-pipeline-demo"
 NAMESPACE="pipeline-demo"
 IMAGE_TAG="0.1.0"
 
@@ -15,3 +15,4 @@ require_context() {
     exit 1
   fi
 }
+

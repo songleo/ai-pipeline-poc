@@ -94,7 +94,7 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         wrappers.append(wrapper)
 
     labels = {
-        "demo.ssli.io/project": "ssli-demo",
+        "demo.ssli.io/project": "pipeline-demo",
         "demo.ssli.io/pipeline": pipeline.metadata.name[:63],
         "demo.ssli.io/run-id": run_id,
     }
@@ -118,3 +118,4 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
             "templates": [{"name": "pipeline", "dag": {"tasks": dag_tasks}}, *wrappers],
         },
     }
+

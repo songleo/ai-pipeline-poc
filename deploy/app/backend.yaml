@@ -9,12 +9,12 @@ spec:
     matchLabels: {app: pipeline-demo-backend}
   template:
     metadata:
-      labels: {app: pipeline-demo-backend, app.kubernetes.io/part-of: ssli-demo}
+      labels: {app: pipeline-demo-backend, app.kubernetes.io/part-of: pipeline-demo}
     spec:
       serviceAccountName: pipeline-demo-backend
       containers:
         - name: backend
-          image: ssli-demo-backend:0.1.0
+          image: pipeline-demo-backend:0.1.0
           imagePullPolicy: IfNotPresent
           ports: [{name: http, containerPort: 8000}]
           env:
@@ -32,3 +32,4 @@ metadata:
 spec:
   selector: {app: pipeline-demo-backend}
   ports: [{name: http, port: 8000, targetPort: http}]
+

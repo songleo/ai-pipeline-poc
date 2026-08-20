@@ -4,7 +4,7 @@ metadata:
   generateName: model-comparison-demo-
   namespace: pipeline-demo
   labels:
-    demo.ssli.io/project: ssli-demo
+    demo.ssli.io/project: pipeline-demo
     demo.ssli.io/pipeline: model-comparison-demo
     demo.ssli.io/run-id: goldenrun001
   annotations:
@@ -164,3 +164,4 @@ spec:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
                 - {name: model, value: '{{inputs.parameters.model}}'}
+

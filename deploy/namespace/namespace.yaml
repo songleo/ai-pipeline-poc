@@ -3,4 +3,5 @@ kind: Namespace
 metadata:
   name: pipeline-demo
   labels:
-    app.kubernetes.io/part-of: ssli-demo
+    app.kubernetes.io/part-of: pipeline-demo
+

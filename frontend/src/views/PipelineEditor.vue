@@ -45,7 +45,7 @@ async function loadExample() {
   flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = examplePipeline.metadata.name; timeoutSeconds.value = examplePipeline.spec.runPolicy.timeoutSeconds
   workflowName.value = undefined; runDetail.value = undefined; await nextTick(); fitView({ padding: 0.15 })
 }
-function saveLocal() { localStorage.setItem('ssli-demo.pipeline', JSON.stringify(currentPipeline())); ElMessage.success('已保存到浏览器') }
+function saveLocal() { localStorage.setItem('pipeline-demo.pipeline', JSON.stringify(currentPipeline())); ElMessage.success('已保存到浏览器') }
 function onDragOver(event: DragEvent) { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'move' }
 function onDrop(event: DragEvent) {
   event.preventDefault(); const type = event.dataTransfer?.getData('application/vueflow'); const definition = registry.value.find(item => item.type === type)
@@ -101,7 +101,7 @@ function minimapColor(node: Node<PipelineNodeData>) { return ({ RUNNING: '#409ef
 onMounted(async () => {
   try {
     registry.value = await api.nodeTypes()
-    const saved = localStorage.getItem('ssli-demo.pipeline')
+    const saved = localStorage.getItem('pipeline-demo.pipeline')
     if (saved) { const pipeline = JSON.parse(saved); const converted = pipelineToFlow(pipeline, registry.value); flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = pipeline.metadata.name }
     else await loadExample()
   } catch (error) { ElMessage.error(`Node Registry 加载失败：${String(error)}`) }
@@ -112,7 +112,7 @@ onBeforeUnmount(stopPolling)
 <template>
   <div class="app-shell">
     <header class="toolbar">
-      <strong>ssli-demo</strong><el-input v-model="pipelineName" size="small" style="width:210px" aria-label="Pipeline name" />
+      <strong>pipeline-demo</strong><el-input v-model="pipelineName" size="small" style="width:210px" aria-label="Pipeline name" />
       <el-button size="small" @click="newPipeline">新建</el-button><el-button size="small" @click="loadExample">加载示例</el-button><el-button size="small" @click="saveLocal">保存本地</el-button>
       <el-button size="small" type="warning" @click="validatePipeline">校验</el-button><el-button size="small" type="primary" @click="run">运行</el-button><el-button size="small" type="danger" :disabled="!canStop" @click="stopRun">停止</el-button>
       <el-button size="small" @click="showPipelineJson">Pipeline JSON</el-button><el-button size="small" @click="showWorkflowYaml">Workflow YAML</el-button>
@@ -130,3 +130,4 @@ onBeforeUnmount(stopPolling)
     <el-dialog v-model="dialogOpen" :title="dialogTitle" width="72%"><pre class="json-dialog">{{ dialogContent }}</pre></el-dialog>
   </div>
 </template>
+
