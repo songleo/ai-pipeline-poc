@@ -1,0 +1,111 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pipeline-demo-nodes
+  namespace: pipeline-demo
+  labels:
+    app.kubernetes.io/part-of: ssli-demo
+spec:
+  templates:
+    - name: generate-data
+      inputs:
+        parameters:
+          - name: node-id
+          - name: sample-count
+          - name: feature-count
+          - name: duration-seconds
+      container:
+        image: ssli-demo-backend:0.1.0
+        command: [python, -c]
+        args:
+          - |
+            import json,time
+            node="{{inputs.parameters.node-id}}"; duration=int("{{inputs.parameters.duration-seconds}}")
+            print(f"[{node}] data generation started",flush=True); time.sleep(duration)
+            out={"kind":"DatasetRef","id":f"dataset-{node}","sampleCount":int("{{inputs.parameters.sample-count}}"),"featureCount":int("{{inputs.parameters.feature-count}}")}
+            open('/tmp/dataset.json','w').write(json.dumps(out)); print(f"[{node}] generated samples={out['sampleCount']}",flush=True)
+      outputs:
+        parameters:
+          - name: dataset
+            valueFrom: {path: /tmp/dataset.json}
+    - name: preprocess-data
+      inputs:
+        parameters:
+          - name: node-id
+          - name: dataset
+          - name: clean-ratio
+          - name: duration-seconds
+      container:
+        image: ssli-demo-backend:0.1.0
+        command: [python, -c]
+        args:
+          - |
+            import json,time
+            node="{{inputs.parameters.node-id}}"; data=json.loads(r'''{{inputs.parameters.dataset}}''')
+            print(f"[{node}] preprocessing started",flush=True); time.sleep(int("{{inputs.parameters.duration-seconds}}"))
+            data.update(id=f"processed-{node}",cleanRatio=float("{{inputs.parameters.clean-ratio}}"))
+            open('/tmp/processed.json','w').write(json.dumps(data)); print(f"[{node}] preprocessing completed",flush=True)
+      outputs:
+        parameters:
+          - name: processedDataset
+            valueFrom: {path: /tmp/processed.json}
+    - name: mock-training
+      inputs:
+        parameters:
+          - name: node-id
+          - name: dataset
+          - name: algorithm
+          - name: duration-seconds
+          - name: accuracy
+          - name: fail-mode
+      container:
+        image: ssli-demo-backend:0.1.0
+        command: [python, -c]
+        args:
+          - |
+            import json,sys,time
+            node="{{inputs.parameters.node-id}}"; algorithm="{{inputs.parameters.algorithm}}"; duration=int("{{inputs.parameters.duration-seconds}}")
+            print(f"[{node}] training started",flush=True); print(f"[{node}] algorithm={algorithm}",flush=True)
+            for p in (25,50,75): time.sleep(duration/4); print(f"[{node}] progress={p}%",flush=True)
+            if "{{inputs.parameters.fail-mode}}" == "always": print(f"[{node}] fixed failure requested",flush=True); sys.exit(42)
+            time.sleep(duration/4); out={"kind":"ModelMetricRef","id":f"model-{node}","algorithm":algorithm,"accuracy":float("{{inputs.parameters.accuracy}}")}
+            open('/tmp/model.json','w').write(json.dumps(out)); print(f"[{node}] accuracy={out['accuracy']}",flush=True); print(f"[{node}] training completed",flush=True)
+      outputs:
+        parameters:
+          - name: model
+            valueFrom: {path: /tmp/model.json}
+    - name: compare-models
+      inputs:
+        parameters:
+          - name: node-id
+          - name: model-a
+          - name: model-b
+      container:
+        image: ssli-demo-backend:0.1.0
+        command: [python, -c]
+        args:
+          - |
+            import json
+            node="{{inputs.parameters.node-id}}"; models=[json.loads(r'''{{inputs.parameters.model-a}}'''),json.loads(r'''{{inputs.parameters.model-b}}''')]
+            best=max(models,key=lambda item:item['accuracy']); open('/tmp/best.json','w').write(json.dumps(best)); print(f"[{node}] best={best['id']} accuracy={best['accuracy']}",flush=True)
+      outputs:
+        parameters:
+          - name: bestModel
+            valueFrom: {path: /tmp/best.json}
+    - name: generate-report
+      inputs:
+        parameters:
+          - name: node-id
+          - name: model
+      container:
+        image: ssli-demo-backend:0.1.0
+        command: [python, -c]
+        args:
+          - |
+            import json
+            node="{{inputs.parameters.node-id}}"; model=json.loads(r'''{{inputs.parameters.model}}'''); report={"kind":"ReportRef","id":f"report-{node}","summary":f"Best model {model['id']} accuracy={model['accuracy']}"}
+            open('/tmp/report.json','w').write(json.dumps(report)); print(f"[{node}] {report['summary']}",flush=True)
+      outputs:
+        parameters:
+          - name: report
+            valueFrom: {path: /tmp/report.json}

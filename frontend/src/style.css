@@ -1,0 +1,28 @@
+:root { font-family: Inter, "Microsoft YaHei", sans-serif; color: #263238; background: #f4f6f9; }
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; }
+.app-shell { height: 100vh; display: flex; flex-direction: column; }
+.toolbar { min-height: 54px; padding: 9px 14px; display: flex; gap: 8px; align-items: center; background: #fff; border-bottom: 1px solid #dcdfe6; box-shadow: 0 1px 4px #0000000d; z-index: 5; }
+.toolbar > strong { font-size: 18px; margin-right: 8px; }
+.workflow-name { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #606266; font-size: 12px; }
+.workspace { flex: 1; min-height: 0; display: flex; }
+.palette { width: 190px; flex: none; padding: 12px; overflow: auto; background: #fff; border-right: 1px solid #dcdfe6; }
+.palette h3 { margin: 0 0 12px; }
+.category-title { margin: 14px 0 6px; color: #909399; font-size: 12px; }
+.palette-item { display: flex; flex-direction: column; gap: 2px; margin-bottom: 7px; padding: 9px; border: 1px solid #dcdfe6; border-radius: 6px; cursor: grab; background: #fafcff; }
+.palette-item:hover { border-color: #409eff; }
+.palette-item small { color: #909399; }
+.flow-wrap { flex: 1; min-width: 0; height: 100%; }
+.pipeline-node { min-width: 160px; padding: 11px 15px; border: 2px solid #909399; border-radius: 9px; background: #fff; box-shadow: 0 3px 10px #00000018; transition: border-color .2s, box-shadow .2s; }
+.pipeline-node.selected { box-shadow: 0 0 0 3px #409eff33; }
+.pipeline-node.status-pending { border-color: #e6a23c; background: #fdf6ec; }
+.pipeline-node.status-running { border-color: #409eff; background: #ecf5ff; animation: pulse 1.2s infinite; }
+.pipeline-node.status-succeeded { border-color: #67c23a; background: #f0f9eb; }
+.pipeline-node.status-failed,.pipeline-node.status-error { border-color: #f56c6c; background: #fef0f0; }
+.pipeline-node.status-cancelled { border-color: #606266; background: #e4e7ed; }
+.node-category { color: #909399; font-size: 11px; }
+.node-type { margin-top: 4px; color: #606266; font-size: 11px; }
+.vue-flow__handle { width: 10px; height: 10px; background: #409eff; }
+.muted { color: #606266; }
+.log-view,.json-dialog { max-height: 360px; overflow: auto; padding: 10px; border-radius: 5px; background: #18222d; color: #d7e1ea; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 5px #409eff22; } }

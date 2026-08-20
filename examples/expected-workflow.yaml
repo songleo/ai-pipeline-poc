@@ -1,0 +1,166 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: model-comparison-demo-
+  namespace: pipeline-demo
+  labels:
+    demo.ssli.io/project: ssli-demo
+    demo.ssli.io/pipeline: model-comparison-demo
+    demo.ssli.io/run-id: goldenrun001
+  annotations:
+    demo.ssli.io/node-map: '{"generate":"generate","preprocess":"preprocess","train-a":"train-a","train-b":"train-b","compare":"compare","report":"report"}'
+    demo.ssli.io/dsl-version: demo.ssli.io/v1alpha1
+spec:
+  entrypoint: pipeline
+  serviceAccountName: pipeline-demo-workflow
+  activeDeadlineSeconds: 300
+  arguments: {parameters: []}
+  templates:
+    - name: pipeline
+      dag:
+        tasks:
+          - name: generate
+            template: node-generate
+            arguments:
+              parameters:
+                - {name: node-id, value: generate}
+                - {name: sample-count, value: '1000'}
+                - {name: feature-count, value: '10'}
+                - {name: duration-seconds, value: '2'}
+          - name: preprocess
+            template: node-preprocess
+            dependencies: [generate]
+            arguments:
+              parameters:
+                - {name: node-id, value: preprocess}
+                - {name: clean-ratio, value: '0.95'}
+                - {name: duration-seconds, value: '2'}
+                - {name: dataset, value: '{{tasks.generate.outputs.parameters.dataset}}'}
+          - name: train-a
+            template: node-train-a
+            dependencies: [preprocess]
+            arguments:
+              parameters:
+                - {name: node-id, value: train-a}
+                - {name: algorithm, value: qwen-demo-a}
+                - {name: duration-seconds, value: '8'}
+                - {name: accuracy, value: '0.86'}
+                - {name: fail-mode, value: never}
+                - {name: dataset, value: '{{tasks.preprocess.outputs.parameters.processedDataset}}'}
+          - name: train-b
+            template: node-train-b
+            dependencies: [preprocess]
+            arguments:
+              parameters:
+                - {name: node-id, value: train-b}
+                - {name: algorithm, value: qwen-demo-b}
+                - {name: duration-seconds, value: '8'}
+                - {name: accuracy, value: '0.89'}
+                - {name: fail-mode, value: never}
+                - {name: dataset, value: '{{tasks.preprocess.outputs.parameters.processedDataset}}'}
+          - name: compare
+            template: node-compare
+            dependencies: [train-a, train-b]
+            arguments:
+              parameters:
+                - {name: node-id, value: compare}
+                - {name: model-a, value: '{{tasks.train-a.outputs.parameters.model}}'}
+                - {name: model-b, value: '{{tasks.train-b.outputs.parameters.model}}'}
+          - name: report
+            template: node-report
+            dependencies: [compare]
+            arguments:
+              parameters:
+                - {name: node-id, value: report}
+                - {name: model, value: '{{tasks.compare.outputs.parameters.bestModel}}'}
+    - name: node-generate
+      inputs:
+        parameters: [{name: node-id}, {name: sample-count}, {name: feature-count}, {name: duration-seconds}]
+      outputs:
+        parameters: [{name: dataset, valueFrom: {parameter: '{{steps.execute.outputs.parameters.dataset}}'}}]
+      retryStrategy: {limit: '0', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: generate-data}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: sample-count, value: '{{inputs.parameters.sample-count}}'}
+                - {name: feature-count, value: '{{inputs.parameters.feature-count}}'}
+                - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
+    - name: node-preprocess
+      inputs:
+        parameters: [{name: node-id}, {name: clean-ratio}, {name: duration-seconds}, {name: dataset}]
+      outputs:
+        parameters: [{name: processedDataset, valueFrom: {parameter: '{{steps.execute.outputs.parameters.processedDataset}}'}}]
+      retryStrategy: {limit: '0', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: preprocess-data}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: clean-ratio, value: '{{inputs.parameters.clean-ratio}}'}
+                - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
+                - {name: dataset, value: '{{inputs.parameters.dataset}}'}
+    - name: node-train-a
+      inputs:
+        parameters: [{name: node-id}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
+      outputs:
+        parameters: [{name: model, valueFrom: {parameter: '{{steps.execute.outputs.parameters.model}}'}}]
+      retryStrategy: {limit: '2', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: mock-training}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: algorithm, value: '{{inputs.parameters.algorithm}}'}
+                - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
+                - {name: accuracy, value: '{{inputs.parameters.accuracy}}'}
+                - {name: fail-mode, value: '{{inputs.parameters.fail-mode}}'}
+                - {name: dataset, value: '{{inputs.parameters.dataset}}'}
+    - name: node-train-b
+      inputs:
+        parameters: [{name: node-id}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
+      outputs:
+        parameters: [{name: model, valueFrom: {parameter: '{{steps.execute.outputs.parameters.model}}'}}]
+      retryStrategy: {limit: '2', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: mock-training}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: algorithm, value: '{{inputs.parameters.algorithm}}'}
+                - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
+                - {name: accuracy, value: '{{inputs.parameters.accuracy}}'}
+                - {name: fail-mode, value: '{{inputs.parameters.fail-mode}}'}
+                - {name: dataset, value: '{{inputs.parameters.dataset}}'}
+    - name: node-compare
+      inputs:
+        parameters: [{name: node-id}, {name: model-a}, {name: model-b}]
+      outputs:
+        parameters: [{name: bestModel, valueFrom: {parameter: '{{steps.execute.outputs.parameters.bestModel}}'}}]
+      retryStrategy: {limit: '0', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: compare-models}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: model-a, value: '{{inputs.parameters.model-a}}'}
+                - {name: model-b, value: '{{inputs.parameters.model-b}}'}
+    - name: node-report
+      inputs:
+        parameters: [{name: node-id}, {name: model}]
+      outputs:
+        parameters: [{name: report, valueFrom: {parameter: '{{steps.execute.outputs.parameters.report}}'}}]
+      retryStrategy: {limit: '0', retryPolicy: Always}
+      steps:
+        - - name: execute
+            templateRef: {name: pipeline-demo-nodes, template: generate-report}
+            arguments:
+              parameters:
+                - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: model, value: '{{inputs.parameters.model}}'}

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pipeline-demo-frontend
+  namespace: pipeline-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: pipeline-demo-frontend}
+  template:
+    metadata:
+      labels: {app: pipeline-demo-frontend, app.kubernetes.io/part-of: ssli-demo}
+    spec:
+      containers:
+        - name: frontend
+          image: ssli-demo-frontend:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            initialDelaySeconds: 2
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pipeline-demo-frontend
+  namespace: pipeline-demo
+spec:
+  selector: {app: pipeline-demo-frontend}
+  ports: [{name: http, port: 8080, targetPort: http}]
