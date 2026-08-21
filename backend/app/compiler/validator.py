@@ -43,6 +43,10 @@ def validate_pipeline(pipeline: Pipeline) -> ValidationResult:
     warnings: list[ValidationIssue] = []
     if not NAME_RE.fullmatch(pipeline.metadata.name) or len(pipeline.metadata.name) > 50:
         errors.append(issue("INVALID_NAME", "Pipeline name must be a lowercase DNS-style name up to 50 characters.", field="metadata.name"))
+    if not pipeline.metadata.experimentName.strip() or len(pipeline.metadata.experimentName) > 60:
+        errors.append(issue("INVALID_EXPERIMENT_NAME", "Experiment name must contain 1-60 characters.", field="metadata.experimentName"))
+    if any(not tag.strip() or len(tag) > 30 for tag in pipeline.metadata.tags):
+        errors.append(issue("INVALID_TAG", "Each tag must contain 1-30 characters.", field="metadata.tags"))
 
     counts = Counter(node.id for node in pipeline.spec.nodes)
     for node_id, count in counts.items():

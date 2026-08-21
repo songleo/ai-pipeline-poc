@@ -98,6 +98,9 @@ def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
     return {
         "workflowName": metadata.get("name"),
         "pipelineName": metadata.get("labels", {}).get("demo.pipeline.io/pipeline"),
+        "experimentName": metadata.get("annotations", {}).get("demo.pipeline.io/experiment"),
+        "scenario": metadata.get("annotations", {}).get("demo.pipeline.io/scenario"),
+        "tags": json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/tags", "[]")),
         "status": workflow_status,
         "startedAt": status.get("startedAt"), "finishedAt": status.get("finishedAt"),
         "message": status.get("message"), "nodes": result_nodes,

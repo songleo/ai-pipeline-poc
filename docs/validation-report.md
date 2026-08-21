@@ -182,9 +182,47 @@ Chrome 页面回归也使用 30 秒双训练分支完成。页面中打开 `trai
 - Kubernetes v1.36.1 不在 Argo v4.0.8 官方 tested matrix；虽然本次 smoke 通过，升级或生产采用前必须按目标版本重新资格验证。
 - 项目默认 Kubernetes v1.33.1 已 EOL，仅适合隔离本地 PoC。
 - 只通过 Argo parameters 传递小 JSON；真实数据集/模型需资源 ID、对象存储 URI、PVC 或 Artifact。
-- 无登录、多租户、数据库、GPU、真实训练、WebSocket 日志、条件/循环/子 Pipeline、跨集群、HA 和生产监控。
+- 无登录、多租户、数据库、真实 GPU、真实训练、WebSocket 日志、循环/子 Pipeline、跨集群、HA 和生产监控；后续 P0 已新增受 Registry 控制的固定条件门禁，但仍不支持用户表达式。
 - 前端 bundle 偏大；PoC 可接受，产品化需代码分割。
 - 节点级默认超时目前仅作为 Registry 元数据保留；Argo steps 包装器不接受 timeout，现阶段由 Workflow 总超时兜底。生产化应改用兼容的模板级/任务级超时设计并单独验证。
+
+## 2026-08-21 P0 训练—评测—准入闭环
+
+本轮把原有技术演示升级为 13 节点专业场景：数据集版本、数据画像、数据质量门禁、特征预处理、两路并行训练、两路模型评测、排行榜、模型准入门禁、模拟模型登记，以及通过/拒绝资格报告。仍不调用 `ai-platform`；所有执行继续由独立后端直接提交到 `kind-pipeline-demo` 的 Argo Workflows。
+
+实现证据：
+
+- Registry 使用 `DatasetRef`、`DataProfileRef`、`ModelRef`、`EvaluationRef`、`CandidateModelRef`、`LeaderboardRef`、`GateDecisionRef`、`RegisteredModelRef` 和 `ReportRef` 类型化端口。
+- 门禁输出由服务端固定映射为 Argo `when` 条件；用户不能提交任意表达式。业务拒绝使未命中分支成为 `SKIPPED`，不会伪装成系统失败。
+- 固定 WorkflowTemplate 只调用 `pipeline-demo-backend:0.1.0` 中的 `app.workflow_nodes`；未开放镜像、Shell、ServiceAccount 或原始 YAML。
+- 固定 Pod resources 对 CPU/内存形成真实 Kubernetes 约束；`gpu-demo` 输出明确标记 `SIMULATED`，不请求 Kind 中不存在的 GPU。
+- 页面新增实验名称/标签、运行概览、门禁决策、模型排行榜和单次 Workflow Artifact Lineage。
+
+自动化验证：
+
+```text
+backend: 28 passed
+frontend Vitest: 6 passed
+frontend vue-tsc: passed
+frontend production build: passed, 1588 modules transformed
+bash -n scripts/*.sh: passed
+```
+
+Kind 部署和真实工作流：
+
+- 后端和前端镜像重新构建并加载到 `pipeline-demo-control-plane`，显式滚动重启后两个 Deployment 均 `1/1 Available`。
+- `make smoke` 等价脚本通过：默认准入流程 `training-qualification-demo-rvbwx` 为 `SUCCEEDED`，模型登记/通过报告成功、拒绝报告 `SKIPPED`；高阈值流程 `training-qualification-rejected-gtvfj` 为 `SUCCEEDED`，登记/通过报告 `SKIPPED`、拒绝报告成功。
+- 固定失败节点完成两次自动重试后 Workflow 为 `FAILED`；长流程收到停止请求后为 `CANCELLED`。
+- 节点控制流程 `node-control-smoke-7nn98` 通过：基线训练被协作式停止且未自动重试，候选训练继续成功；从基线训练节点重跑后，只重跑所选节点及其下游，最终 Workflow 成功。
+
+Chrome 实际交互回归：
+
+- 点击“新建”，从节点面板拖入“选择数据集版本”和“数据画像”，再从 `dataset: DatasetRef` 输出 Handle 连到同类型输入；Pipeline JSON 出现正确 `sourcePort=dataset`、`targetPort=dataset` Edge。
+- 从 Chrome 点击“加载示例”和“运行”创建 `training-qualification-demo-94xcs`，最终 13/13 节点终态、Workflow `SUCCEEDED`，拒绝报告显示 `SKIPPED`。
+- 右侧排行榜显示 xgboost `accuracy=0.915, f1=0.8625` 排名 1，lightgbm `accuracy=0.88, f1=0.825` 排名 2；概览显示数据质量和模型准入均 `APPROVED`；Lineage 显示从 Dataset 到 Report 的全部类型化引用。
+- Windows 实测 `http://localhost:5173/` 返回 HTTP 200，`http://localhost:5173/api/health` 返回 `status=ok`。
+
+边界：这些是本机 Kind PoC 证据，不代表真实训练、真实 GPU、生产模型登记或 `ai-platform` 集成。当前 Lineage 只来自保留中的 Workflow 小型输出，不是持久化 ML Metadata 服务。
 
 ## 技术建议
 

@@ -15,12 +15,12 @@ def test_status_mapping() -> None:
 
 def test_argo_v2_pod_name_matches_node_id_suffix() -> None:
     assert _pod_name_matches(
-        "model-comparison-demo-abc-mock-training-1327291279",
-        "model-comparison-demo-abc-1327291279",
+        "training-qualification-demo-abc-train-model-1327291279",
+        "training-qualification-demo-abc-1327291279",
     )
     assert not _pod_name_matches(
-        "model-comparison-demo-abc-mock-training-52739434",
-        "model-comparison-demo-abc-1327291279",
+        "training-qualification-demo-abc-train-model-52739434",
+        "training-qualification-demo-abc-1327291279",
     )
 
 

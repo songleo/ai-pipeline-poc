@@ -1,6 +1,6 @@
 # pipeline-demo
 
-`pipeline-demo` 是一个独立的可视化 AI Pipeline PoC，用最小闭环验证 Vue Flow 编辑 DAG、自定义 JSON DSL、FastAPI Compiler、Argo Workflows 执行，以及状态、日志和输出回传。它不接入 `ai-platform`，也不允许浏览器直接访问 Kubernetes。
+`pipeline-demo` 是一个独立的可视化 AI Pipeline PoC，演示“数据版本 → 数据质量 → 并行训练 → 模型评测 → 排行榜 → 准入门禁 → 模型登记/拒绝报告”的专业闭环。它不接入 `ai-platform`，由 FastAPI 后端直接把受控 DSL 编译为 Argo Workflow，也不允许浏览器直接访问 Kubernetes。
 
 ## 架构简介
 
@@ -58,14 +58,14 @@ npm run dev
 
 ## 演示与测试
 
-在页面点击“加载示例”，然后“校验”和“运行”。示例拓扑为生成数据 → 预处理 → 两个并行训练 → 模型对比 → 报告。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
+在页面点击“加载示例”，然后“校验”和“运行”。默认示例包含 13 个可编排节点、两个真实条件门禁、并行训练/评测、模型排行榜、模拟模型版本登记和 Artifact Lineage 视图。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
 
 ```bash
 make test
 make smoke
 ```
 
-`make smoke` 检查健康、Registry、校验、提交、成功终态、节点状态、日志、输出和两训练节点时间区间重叠。实际执行证据见 [验证报告](docs/validation-report.md)。
+`make smoke` 检查健康、Registry、校验、提交、通过/拒绝两种门禁路径、排行榜、节点状态、日志、输出和两训练节点时间区间重叠。实际执行证据见 [验证报告](docs/validation-report.md)。
 
 ## 停止和清理
 
@@ -88,7 +88,7 @@ make clean
 
 ## 当前限制
 
-本 PoC 只传递小型 Argo output parameters。真实数据集和模型必须改用资源 ID、对象存储 URI、PVC 或 Argo Artifact。当前没有登录、多租户、数据库、GPU、真实训练、Artifact Lineage、WebSocket 日志、定时/条件/循环/子 Pipeline、任意镜像或 Shell、跨集群和生产级高可用。更多后续边界见 [ai-platform 后续建议](docs/ai-platform-follow-up.md)。
+本 PoC 的 Dataset/Model/Evaluation/Report 都是小型结构化引用，Lineage 也是本次 Workflow 内的演示视图；真实数据和模型仍必须改用资源 ID、对象存储 URI、PVC 或 Argo Artifact。CPU/内存由固定 Pod resources 约束，`gpu-demo` 只展示模拟规格，不请求真实 GPU。当前没有登录、多租户、数据库、真实训练、持久化 Artifact Metadata、WebSocket 日志、定时/循环/子 Pipeline、任意镜像或 Shell、跨集群和生产级高可用。
 
 ## 官方版本依据
 

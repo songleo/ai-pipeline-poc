@@ -33,10 +33,10 @@ wait_for_status() {
 }
 
 curl -fsS "$API_URL/api/health" | grep -q 'ok'
-curl -fsS "$API_URL/api/node-types" | grep -q 'mock-training'
-curl -fsS -H 'Content-Type: application/json' --data-binary "@$PROJECT_ROOT/examples/model-comparison-pipeline.json" "$API_URL/api/pipelines/validate" | grep -q '"valid":true'
+curl -fsS "$API_URL/api/node-types" | grep -q 'model-admission-gate'
+curl -fsS -H 'Content-Type: application/json' --data-binary "@$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$API_URL/api/pipelines/validate" | grep -q '"valid":true'
 
-workflow="$(submit_pipeline "$PROJECT_ROOT/examples/model-comparison-pipeline.json")"
+workflow="$(submit_pipeline "$PROJECT_ROOT/examples/training-qualification-pipeline.json")"
 echo "Submitted $workflow"
 
 run="$(wait_for_status "$workflow" SUCCEEDED 360)"
@@ -44,19 +44,45 @@ run="$(wait_for_status "$workflow" SUCCEEDED 360)"
 python3 - "$run" <<'PY'
 import json,sys
 r=json.loads(sys.argv[1]); nodes={n['nodeId']:n for n in r['nodes']}
-a,b=nodes['train-a'],nodes['train-b']
+a,b=nodes['train-baseline'],nodes['train-candidate']
 assert a['startedAt'] < b['finishedAt'] and b['startedAt'] < a['finishedAt'], 'training intervals did not overlap'
+assert nodes['register']['status']=='SUCCEEDED'
+assert nodes['approved-report']['status']=='SUCCEEDED'
+assert nodes['rejected-report']['status']=='SKIPPED'
 PY
-curl -fsS "$API_URL/api/runs/$workflow/nodes/train-a/logs" | grep -q 'training completed'
-curl -fsS "$API_URL/api/runs/$workflow/nodes/report/output" | grep -q 'ReportRef'
+curl -fsS "$API_URL/api/runs/$workflow/nodes/train-baseline/logs" | grep -q 'training completed'
+curl -fsS "$API_URL/api/runs/$workflow/nodes/leaderboard/output" | grep -q 'LeaderboardRef'
+curl -fsS "$API_URL/api/runs/$workflow/nodes/admission/output" | grep -q 'APPROVED'
 
-python3 - "$PROJECT_ROOT/examples/model-comparison-pipeline.json" "$TMP_DIR/failing.json" <<'PY'
+python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/rejected.json" <<'PY'
+import json,sys
+value=json.load(open(sys.argv[1],encoding="utf-8"))
+value["metadata"]["name"]="training-qualification-rejected"
+for node in value["spec"]["nodes"]:
+    if node["id"] == "admission":
+        node["parameters"]["minAccuracy"]=0.99
+    if "durationSeconds" in node["parameters"]:
+        node["parameters"]["durationSeconds"]=1
+json.dump(value,open(sys.argv[2],"w",encoding="utf-8"))
+PY
+rejected_workflow="$(submit_pipeline "$TMP_DIR/rejected.json")"
+rejected_run="$(wait_for_status "$rejected_workflow" SUCCEEDED 240)"
+python3 - "$rejected_run" <<'PY'
+import json,sys
+nodes={item["nodeId"]:item for item in json.loads(sys.argv[1])["nodes"]}
+assert nodes["register"]["status"] == "SKIPPED"
+assert nodes["approved-report"]["status"] == "SKIPPED"
+assert nodes["rejected-report"]["status"] == "SUCCEEDED"
+PY
+curl -fsS "$API_URL/api/runs/$rejected_workflow/nodes/admission/output" | grep -q 'REJECTED'
+
+python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/failing.json" <<'PY'
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 for node in value["spec"]["nodes"]:
-    if node["id"] == "train-a":
+    if node["id"] == "train-baseline":
         node["parameters"].update(failMode="always", retryLimit=2, durationSeconds=1)
-    elif node["type"] == "mock-training":
+    elif node["type"] == "train-model":
         node["parameters"]["durationSeconds"]=1
 json.dump(value,open(sys.argv[2],"w",encoding="utf-8"))
 PY
@@ -65,11 +91,11 @@ failed_run="$(wait_for_status "$failed_workflow" FAILED 180)"
 python3 - "$failed_run" <<'PY'
 import json,sys
 nodes={item["nodeId"]:item for item in json.loads(sys.argv[1])["nodes"]}
-assert nodes["train-a"]["retryCount"] >= 2, nodes["train-a"]
+assert nodes["train-baseline"]["retryCount"] >= 2, nodes["train-baseline"]
 PY
-curl -fsS "$API_URL/api/runs/$failed_workflow/nodes/train-a/logs" | grep -q 'fixed failure requested'
+curl -fsS "$API_URL/api/runs/$failed_workflow/nodes/train-baseline/logs" | grep -q 'fixed failure requested'
 
-python3 - "$PROJECT_ROOT/examples/model-comparison-pipeline.json" "$TMP_DIR/stoppable.json" <<'PY'
+python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/stoppable.json" <<'PY'
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 for node in value["spec"]["nodes"]:
@@ -82,4 +108,4 @@ wait_for_status "$stopped_workflow" RUNNING 90 >/dev/null
 curl -fsS -X POST "$API_URL/api/runs/$stopped_workflow/stop" | grep -q 'CANCELLED'
 wait_for_status "$stopped_workflow" CANCELLED 90 >/dev/null
 
-echo "Smoke test passed: health, registry, validation, success, parallel overlap, logs, output, fixed failure retries, and manual stop."
+echo "Smoke test passed: health, registry, validation, approved/rejected gates, parallel training, leaderboard, logs, retries, and manual stop."

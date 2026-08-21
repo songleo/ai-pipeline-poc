@@ -31,6 +31,8 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 6. Kubernetes API 在 `pipeline-demo` 创建 Workflow；Argo controller 创建 Pod。
 7. 后端把 Argo phase 映射为统一状态，解析节点/Pod/重试次数与 output parameters。
 
+门禁节点是受控的特殊节点：固定模板输出 `APPROVED` 或 `REJECTED`，Registry 把业务输出端口映射成固定 Argo `when` 条件。用户不能提交表达式。未命中分支映射为 `SKIPPED`，因此业务拒绝仍可让 Workflow 正常成功，并与容器失败、系统错误区分。
+
 预处理完成后两个训练 task 仅依赖 preprocess，因此可以并行；compare 同时依赖两者，report 依赖 compare。
 
 ## 状态、日志和输出链路
@@ -52,4 +54,4 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 
 ## 数据边界
 
-本 PoC 只验证小型 JSON parameter。它不适合传递真实数据集或模型；后续应传资源 ID、对象存储 URI，或使用 PVC/Argo Artifact。参数大小、Kubernetes 对象大小和日志保存都不是生产级 Artifact 通道。
+本 PoC 使用小型类型化 JSON 引用演示 Dataset、Model、Evaluation、Decision、Report 和单次运行 Lineage。它不适合传递真实数据集或模型；后续应传资源 ID、对象存储 URI，或使用 PVC/Argo Artifact。参数大小、Kubernetes 对象大小、Lineage 保留和日志保存都不是生产级 Artifact 通道。

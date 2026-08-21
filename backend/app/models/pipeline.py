@@ -5,6 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class Metadata(BaseModel):
     name: str
+    experimentName: str = "model-qualification"
+    scenario: str = "training-evaluation-admission"
+    tags: list[str] = Field(default_factory=list, max_length=10)
 
 
 class PipelineNode(BaseModel):

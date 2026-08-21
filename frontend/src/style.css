@@ -2,7 +2,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; }
 .app-shell { height: 100vh; display: flex; flex-direction: column; }
-.toolbar { min-height: 54px; padding: 9px 14px; display: flex; gap: 8px; align-items: center; background: #fff; border-bottom: 1px solid #dcdfe6; box-shadow: 0 1px 4px #0000000d; z-index: 5; }
+.toolbar { min-height: 54px; padding: 9px 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #fff; border-bottom: 1px solid #dcdfe6; box-shadow: 0 1px 4px #0000000d; z-index: 5; }
 .toolbar > strong { font-size: 18px; margin-right: 8px; }
 .workflow-name { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #606266; font-size: 12px; }
 .workspace { flex: 1; min-height: 0; display: flex; }
@@ -13,6 +13,13 @@ body { margin: 0; overflow: hidden; }
 .palette-item:hover { border-color: #409eff; }
 .palette-item small { color: #909399; }
 .flow-wrap { flex: 1; min-width: 0; height: 100%; }
+.insights { width: 330px; flex: none; padding: 12px; overflow: auto; background: #fff; border-left: 1px solid #dcdfe6; }
+.insights-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.decision-card { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #ebeef5; font-size: 13px; }
+.artifact-card { display: flex; flex-direction: column; gap: 2px; padding: 8px; margin-bottom: 7px; border: 1px solid #dcdfe6; border-radius: 6px; background: #fafcff; overflow: hidden; }
+.artifact-card strong,.artifact-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.artifact-card small { color: #909399; }
+.artifact-kind { color: #409eff; font-size: 11px; }
 .pipeline-node { min-width: 160px; padding: 11px 15px; border: 2px solid #909399; border-radius: 9px; background: #fff; box-shadow: 0 3px 10px #00000018; transition: border-color .2s, box-shadow .2s; }
 .pipeline-node.selected { box-shadow: 0 0 0 3px #409eff33; }
 .pipeline-node.status-pending { border-color: #e6a23c; background: #fdf6ec; }
@@ -20,6 +27,7 @@ body { margin: 0; overflow: hidden; }
 .pipeline-node.status-succeeded { border-color: #67c23a; background: #f0f9eb; }
 .pipeline-node.status-failed,.pipeline-node.status-error { border-color: #f56c6c; background: #fef0f0; }
 .pipeline-node.status-cancelled { border-color: #606266; background: #e4e7ed; }
+.pipeline-node.status-skipped { border-color: #909399; background: #f4f4f5; opacity: .72; }
 .node-category { color: #909399; font-size: 11px; }
 .node-type { margin-top: 4px; color: #606266; font-size: 11px; }
 .vue-flow__handle { width: 14px; height: 14px; z-index: 2; cursor: crosshair; border: 2px solid #fff; background: #409eff; box-shadow: 0 0 0 1px #337ecc; }

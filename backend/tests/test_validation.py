@@ -8,7 +8,7 @@ from app.compiler import validate_pipeline
 from app.models.pipeline import Pipeline
 
 
-EXAMPLE = Path(__file__).parents[2] / "examples" / "model-comparison-pipeline.json"
+EXAMPLE = Path(__file__).parents[2] / "examples" / "training-qualification-pipeline.json"
 
 
 def data() -> dict:
@@ -28,7 +28,7 @@ def test_valid_dag() -> None:
 
 def test_cycle_detection() -> None:
     value = data()
-    value["spec"]["edges"].append({"source": "report", "sourcePort": "report", "target": "preprocess", "targetPort": "dataset"})
+    value["spec"]["edges"].append({"source": "register", "sourcePort": "registeredModel", "target": "preprocess", "targetPort": "dataset"})
     assert "DAG_CYCLE" in codes(value)
 
 
@@ -59,12 +59,12 @@ def test_port_does_not_exist() -> None:
 
 
 def test_port_type_mismatch() -> None:
-    value = data(); value["spec"]["edges"][3]["source"] = "generate"; value["spec"]["edges"][3]["sourcePort"] = "dataset"
+    value = data(); value["spec"]["edges"][10]["source"] = "dataset"; value["spec"]["edges"][10]["sourcePort"] = "dataset"
     assert "PORT_TYPE_MISMATCH" in codes(value)
 
 
 def test_required_input_not_connected() -> None:
-    value = data(); value["spec"]["edges"] = [e for e in value["spec"]["edges"] if not (e["target"] == "compare" and e["targetPort"] == "modelB")]
+    value = data(); value["spec"]["edges"] = [e for e in value["spec"]["edges"] if not (e["target"] == "leaderboard" and e["targetPort"] == "evaluationB")]
     assert "MISSING_REQUIRED_INPUT" in codes(value)
 
 

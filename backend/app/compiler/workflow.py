@@ -48,6 +48,7 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         raise ValueError(validation.model_dump(mode="json"))
     run_id = run_id or uuid.uuid4().hex[:12]
     mapping = safe_task_names([node.id for node in pipeline.spec.nodes])
+    nodes_by_id = {node.id: node for node in pipeline.spec.nodes}
     incoming: dict[str, list[Any]] = defaultdict(list)
     parents: dict[str, set[str]] = defaultdict(set)
     for edge in pipeline.spec.edges:
@@ -78,6 +79,18 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         }
         if parents[node.id]:
             task["dependencies"] = sorted(mapping[parent] for parent in parents[node.id])
+        branch_expressions: set[str] = set()
+        for edge in incoming[node.id]:
+            source_definition = NODE_TYPES[nodes_by_id[edge.source].type]
+            condition = source_definition.get("branchConditions", {}).get(edge.sourcePort)
+            if condition:
+                branch_expressions.add(
+                    f"{{{{tasks.{mapping[edge.source]}.outputs.parameters.{condition['output']}}}}} == {condition['value']}"
+                )
+        if len(branch_expressions) > 1:
+            raise ValueError(f"Node '{node.id}' has incompatible branch conditions.")
+        if branch_expressions:
+            task["when"] = branch_expressions.pop()
         dag_tasks.append(task)
 
         execute = {
@@ -90,7 +103,7 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
             "inputs": {"parameters": inputs},
             "outputs": {"parameters": [
                 {"name": port["name"], "valueFrom": {"parameter": f"{{{{steps.execute.outputs.parameters.{port['name']}}}}}"}}
-                for port in definition["outputPorts"]
+                for port in [*definition["outputPorts"], *({"name": name} for name in definition.get("internalOutputs", []))]
             ]},
             "steps": [[execute]],
         }
@@ -111,6 +124,9 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
             "annotations": {
                 "demo.pipeline.io/node-map": json.dumps(mapping, separators=(",", ":")),
                 "demo.pipeline.io/dsl-version": pipeline.apiVersion,
+                "demo.pipeline.io/experiment": pipeline.metadata.experimentName,
+                "demo.pipeline.io/scenario": pipeline.metadata.scenario,
+                "demo.pipeline.io/tags": json.dumps(pipeline.metadata.tags, separators=(",", ":")),
             },
         },
         "spec": {

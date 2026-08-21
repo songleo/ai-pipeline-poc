@@ -17,6 +17,8 @@ const registry = ref<NodeTypeDefinition[]>([])
 const flowNodes = shallowRef<Node<PipelineNodeData>[]>([])
 const flowEdges = shallowRef<Edge[]>([])
 const pipelineName = ref('untitled-pipeline')
+const experimentName = ref('模型资格评审')
+const tagsText = ref('p0,qualification')
 const timeoutSeconds = ref(300)
 const selectedId = ref<string>()
 const drawerOpen = ref(false)
@@ -36,14 +38,27 @@ const selectedNode = computed(() => flowNodes.value.find(item => item.id === sel
 const selectedRuntime = computed(() => runDetail.value?.nodes.find(item => item.nodeId === selectedId.value))
 const currentStatus = computed(() => runDetail.value?.status ?? 'IDLE')
 const canStop = computed(() => !!workflowName.value && !terminalStatuses.has(currentStatus.value as UnifiedStatus))
+const artifacts = computed(() => (runDetail.value?.nodes ?? []).flatMap(node => {
+  const gateDecision = (node.outputs.approvedDecision ?? node.outputs.rejectedDecision) as Record<string, unknown> | undefined
+  return Object.entries(node.outputs).flatMap(([port, value]) => {
+    if (gateDecision?.outcome === 'APPROVED' && port.startsWith('rejected')) return []
+    if (gateDecision?.outcome === 'REJECTED' && port.startsWith('approved')) return []
+    if (!value || typeof value !== 'object' || !('kind' in value)) return []
+    const artifact = value as Record<string, unknown>
+    return [{ nodeId: node.nodeId, port, kind: String(artifact.kind), id: String(artifact.id ?? '-'), value: artifact }]
+  })
+}))
+const leaderboard = computed(() => artifacts.value.find(item => item.kind === 'LeaderboardRef')?.value.entries as Array<Record<string, unknown>> | undefined)
+const decisions = computed(() => artifacts.value.filter(item => item.kind === 'GateDecisionRef').filter((item, index, values) => values.findIndex(other => other.id === item.id) === index))
+const completedCount = computed(() => runDetail.value?.nodes.filter(node => ['SUCCEEDED', 'SKIPPED'].includes(node.status)).length ?? 0)
 
-function currentPipeline() { return flowToPipeline(pipelineName.value, flowNodes.value, flowEdges.value, timeoutSeconds.value) }
+function currentPipeline() { return flowToPipeline(pipelineName.value, experimentName.value, tagsText.value.split(',').map(item => item.trim()).filter(Boolean), flowNodes.value, flowEdges.value, timeoutSeconds.value) }
 function newPipeline() {
-  stopPolling(); flowNodes.value = []; flowEdges.value = []; pipelineName.value = 'untitled-pipeline'; workflowName.value = undefined; runDetail.value = undefined
+  stopPolling(); flowNodes.value = []; flowEdges.value = []; pipelineName.value = 'untitled-pipeline'; experimentName.value = '模型资格评审'; tagsText.value = 'p0,qualification'; workflowName.value = undefined; runDetail.value = undefined
 }
 async function loadExample() {
   const converted = pipelineToFlow(structuredClone(examplePipeline), registry.value)
-  flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = examplePipeline.metadata.name; timeoutSeconds.value = examplePipeline.spec.runPolicy.timeoutSeconds
+  flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = examplePipeline.metadata.name; experimentName.value = examplePipeline.metadata.experimentName; tagsText.value = examplePipeline.metadata.tags.join(','); timeoutSeconds.value = examplePipeline.spec.runPolicy.timeoutSeconds
   workflowName.value = undefined; runDetail.value = undefined; await nextTick(); fitView({ padding: 0.15 })
 }
 function saveLocal() { localStorage.setItem('pipeline-demo.pipeline', JSON.stringify(currentPipeline())); ElMessage.success('已保存到浏览器') }
@@ -120,7 +135,7 @@ onMounted(async () => {
   try {
     registry.value = await api.nodeTypes()
     const saved = localStorage.getItem('pipeline-demo.pipeline')
-    if (saved) { const pipeline = JSON.parse(saved); const converted = pipelineToFlow(pipeline, registry.value); flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = pipeline.metadata.name }
+    if (saved) { const pipeline = JSON.parse(saved); const converted = pipelineToFlow(pipeline, registry.value); flowNodes.value = converted.nodes; flowEdges.value = converted.edges; pipelineName.value = pipeline.metadata.name; experimentName.value = pipeline.metadata.experimentName ?? '模型资格评审'; tagsText.value = (pipeline.metadata.tags ?? []).join(','); timeoutSeconds.value = pipeline.spec.runPolicy.timeoutSeconds }
     else await loadExample()
   } catch (error) { ElMessage.error(`Node Registry 加载失败：${String(error)}`) }
 })
@@ -130,7 +145,9 @@ onBeforeUnmount(stopPolling)
 <template>
   <div class="app-shell">
     <header class="toolbar">
-      <strong>pipeline-demo</strong><el-input v-model="pipelineName" size="small" style="width:210px" aria-label="Pipeline name" />
+      <strong>Pipeline Studio</strong><el-input v-model="pipelineName" size="small" style="width:190px" aria-label="Pipeline name" />
+      <el-input v-model="experimentName" size="small" style="width:180px" aria-label="Experiment name" placeholder="实验名称" />
+      <el-input v-model="tagsText" size="small" style="width:150px" aria-label="Run tags" placeholder="标签，逗号分隔" />
       <el-button size="small" @click="newPipeline">新建</el-button><el-button size="small" @click="loadExample">加载示例</el-button><el-button size="small" @click="saveLocal">保存本地</el-button>
       <el-button size="small" type="warning" @click="validatePipeline">校验</el-button><el-button size="small" type="primary" @click="run">运行</el-button><el-button size="small" type="danger" :disabled="!canStop" @click="stopRun">停止</el-button>
       <el-button size="small" @click="showPipelineJson">Pipeline JSON</el-button><el-button size="small" @click="showWorkflowYaml">Workflow YAML</el-button>
@@ -143,6 +160,36 @@ onBeforeUnmount(stopPolling)
           <Background pattern-color="#d7dce5" :gap="18" /><MiniMap :node-color="minimapColor" pannable zoomable /><Controls />
         </VueFlow>
       </div>
+      <aside v-if="runDetail" class="insights">
+        <div class="insights-title"><strong>运行洞察</strong><el-tag size="small">{{ completedCount }}/{{ runDetail.nodes.length }}</el-tag></div>
+        <el-tabs>
+          <el-tab-pane label="概览">
+            <el-descriptions :column="1" size="small" border>
+              <el-descriptions-item label="实验">{{ runDetail.experimentName }}</el-descriptions-item>
+              <el-descriptions-item label="状态">{{ runDetail.status }}</el-descriptions-item>
+              <el-descriptions-item label="开始">{{ runDetail.startedAt || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="结束">{{ runDetail.finishedAt || '-' }}</el-descriptions-item>
+            </el-descriptions>
+            <h4>门禁决策</h4>
+            <div v-for="item in decisions" :key="item.id" class="decision-card">
+              <el-tag :type="item.value.outcome === 'APPROVED' ? 'success' : 'danger'">{{ item.value.outcome }}</el-tag>
+              <span>{{ item.value.gate }}</span>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="排行榜">
+            <el-table v-if="leaderboard" :data="leaderboard" size="small">
+              <el-table-column prop="rank" label="#" width="38" /><el-table-column prop="algorithm" label="模型" />
+              <el-table-column prop="accuracy" label="Acc" width="58" /><el-table-column prop="f1" label="F1" width="55" />
+            </el-table>
+            <el-empty v-else description="排行榜尚未生成" :image-size="60" />
+          </el-tab-pane>
+          <el-tab-pane label="Lineage">
+            <div v-for="item in artifacts" :key="`${item.nodeId}-${item.port}`" class="artifact-card">
+              <span class="artifact-kind">{{ item.kind }}</span><strong>{{ item.id }}</strong><small>{{ item.nodeId }} · {{ item.port }}</small>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </aside>
     </main>
     <NodeConfigDrawer v-model="drawerOpen" :data="selectedNode?.data" :runtime="selectedRuntime" :logs="logs" :output="output" :control-busy="controlBusy" @changed="refreshSelectedNode" @stop-node="stopSelectedNode" @rerun-node="rerunSelectedNode" />
     <el-dialog v-model="dialogOpen" :title="dialogTitle" width="72%"><pre class="json-dialog">{{ dialogContent }}</pre></el-dialog>

@@ -3,145 +3,149 @@ kind: WorkflowTemplate
 metadata:
   name: pipeline-demo-nodes
   namespace: pipeline-demo
-  labels:
-    app.kubernetes.io/part-of: pipeline-demo
+  labels: {app.kubernetes.io/part-of: pipeline-demo}
 spec:
   templates:
-    - name: generate-data
+    - name: dataset-version
       inputs:
         parameters:
-          - name: node-id
-          - name: workflow-name
-          - name: retry-limit
-          - name: sample-count
-          - name: feature-count
-          - name: duration-seconds
-      retryStrategy:
+          - {name: node-id}
+          - {name: workflow-name}
+          - {name: retry-limit}
+          - {name: dataset-name}
+          - {name: version}
+          - {name: sample-count}
+          - {name: missing-rate}
+          - {name: class-balance}
+          - {name: duration-seconds}
+      retryStrategy: &retry
         limit: "{{inputs.parameters.retry-limit}}"
         retryPolicy: Always
         expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
-        command: [python, -c]
-        args:
-          - |
-            import json
-            from app.node_control import controlled_sleep
-            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; duration=int("{{inputs.parameters.duration-seconds}}")
-            print(f"[{node}] data generation started",flush=True); controlled_sleep(workflow,node,duration)
-            out={"kind":"DatasetRef","id":f"dataset-{node}","sampleCount":int("{{inputs.parameters.sample-count}}"),"featureCount":int("{{inputs.parameters.feature-count}}")}
-            open('/tmp/dataset.json','w').write(json.dumps(out)); print(f"[{node}] generated samples={out['sampleCount']}",flush=True)
+        command: [python, -m, app.workflow_nodes]
+        args: [dataset-version, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.dataset-name}}", "{{inputs.parameters.version}}", "{{inputs.parameters.sample-count}}", "{{inputs.parameters.missing-rate}}", "{{inputs.parameters.class-balance}}", "{{inputs.parameters.duration-seconds}}"]
+        resources: &resources {requests: {cpu: 25m, memory: 48Mi}, limits: {cpu: 250m, memory: 128Mi}}
       outputs:
-        parameters:
-          - name: dataset
-            valueFrom: {path: /tmp/dataset.json}
-    - name: preprocess-data
-      inputs:
-        parameters:
-          - name: node-id
-          - name: workflow-name
-          - name: retry-limit
-          - name: dataset
-          - name: clean-ratio
-          - name: duration-seconds
-      retryStrategy:
-        limit: "{{inputs.parameters.retry-limit}}"
-        retryPolicy: Always
-        expression: asInt(lastRetry.exitCode) != 64
-      container:
-        image: pipeline-demo-backend:0.1.0
-        command: [python, -c]
-        args:
-          - |
-            import json
-            from app.node_control import controlled_sleep
-            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; data=json.loads(r'''{{inputs.parameters.dataset}}''')
-            print(f"[{node}] preprocessing started",flush=True); controlled_sleep(workflow,node,int("{{inputs.parameters.duration-seconds}}"))
-            data.update(id=f"processed-{node}",cleanRatio=float("{{inputs.parameters.clean-ratio}}"))
-            open('/tmp/processed.json','w').write(json.dumps(data)); print(f"[{node}] preprocessing completed",flush=True)
-      outputs:
-        parameters:
-          - name: processedDataset
-            valueFrom: {path: /tmp/processed.json}
-    - name: mock-training
-      inputs:
-        parameters:
-          - name: node-id
-          - name: workflow-name
-          - name: retry-limit
-          - name: dataset
-          - name: algorithm
-          - name: duration-seconds
-          - name: accuracy
-          - name: fail-mode
-      retryStrategy:
-        limit: "{{inputs.parameters.retry-limit}}"
-        retryPolicy: Always
-        expression: asInt(lastRetry.exitCode) != 64
-      container:
-        image: pipeline-demo-backend:0.1.0
-        command: [python, -c]
-        args:
-          - |
-            import json,sys
-            from app.node_control import controlled_sleep
-            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; algorithm="{{inputs.parameters.algorithm}}"; duration=int("{{inputs.parameters.duration-seconds}}")
-            print(f"[{node}] training started",flush=True); print(f"[{node}] algorithm={algorithm}",flush=True)
-            for p in (25,50,75): controlled_sleep(workflow,node,duration/4); print(f"[{node}] progress={p}%",flush=True)
-            if "{{inputs.parameters.fail-mode}}" == "always": print(f"[{node}] fixed failure requested",flush=True); sys.exit(42)
-            controlled_sleep(workflow,node,duration/4); out={"kind":"ModelMetricRef","id":f"model-{node}","algorithm":algorithm,"accuracy":float("{{inputs.parameters.accuracy}}")}
-            open('/tmp/model.json','w').write(json.dumps(out)); print(f"[{node}] accuracy={out['accuracy']}",flush=True); print(f"[{node}] training completed",flush=True)
-      outputs:
-        parameters:
-          - name: model
-            valueFrom: {path: /tmp/model.json}
-    - name: compare-models
-      inputs:
-        parameters:
-          - name: node-id
-          - name: workflow-name
-          - name: retry-limit
-          - name: model-a
-          - name: model-b
-      retryStrategy:
-        limit: "{{inputs.parameters.retry-limit}}"
-        retryPolicy: Always
-        expression: asInt(lastRetry.exitCode) != 64
-      container:
-        image: pipeline-demo-backend:0.1.0
-        command: [python, -c]
-        args:
-          - |
-            import json
-            from app.node_control import ensure_node_running
-            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; ensure_node_running(workflow,node); models=[json.loads(r'''{{inputs.parameters.model-a}}'''),json.loads(r'''{{inputs.parameters.model-b}}''')]
-            best=max(models,key=lambda item:item['accuracy']); open('/tmp/best.json','w').write(json.dumps(best)); print(f"[{node}] best={best['id']} accuracy={best['accuracy']}",flush=True)
-      outputs:
-        parameters:
-          - name: bestModel
-            valueFrom: {path: /tmp/best.json}
-    - name: generate-report
-      inputs:
-        parameters:
-          - name: node-id
-          - name: workflow-name
-          - name: retry-limit
-          - name: model
-      retryStrategy:
-        limit: "{{inputs.parameters.retry-limit}}"
-        retryPolicy: Always
-        expression: asInt(lastRetry.exitCode) != 64
-      container:
-        image: pipeline-demo-backend:0.1.0
-        command: [python, -c]
-        args:
-          - |
-            import json
-            from app.node_control import ensure_node_running
-            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; ensure_node_running(workflow,node); model=json.loads(r'''{{inputs.parameters.model}}'''); report={"kind":"ReportRef","id":f"report-{node}","summary":f"Best model {model['id']} accuracy={model['accuracy']}"}
-            open('/tmp/report.json','w').write(json.dumps(report)); print(f"[{node}] {report['summary']}",flush=True)
-      outputs:
-        parameters:
-          - name: report
-            valueFrom: {path: /tmp/report.json}
+        parameters: [{name: dataset, valueFrom: {path: /tmp/dataset.json}}]
 
+    - name: data-profile
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: dataset}, {name: duration-seconds}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [data-profile, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.dataset}}", "{{inputs.parameters.duration-seconds}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: profile, valueFrom: {path: /tmp/profile.json}}]
+
+    - name: data-quality-gate
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: dataset}, {name: profile}, {name: min-samples}, {name: max-missing-rate}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [data-quality-gate, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.dataset}}", "{{inputs.parameters.profile}}", "{{inputs.parameters.min-samples}}", "{{inputs.parameters.max-missing-rate}}"]
+        resources: *resources
+      outputs:
+        parameters:
+          - {name: approvedDataset, valueFrom: {path: /tmp/approvedDataset.json}}
+          - {name: rejectedDataset, valueFrom: {path: /tmp/rejectedDataset.json}}
+          - {name: approvedDecision, valueFrom: {path: /tmp/approvedDecision.json}}
+          - {name: rejectedDecision, valueFrom: {path: /tmp/rejectedDecision.json}}
+          - {name: decision, valueFrom: {path: /tmp/decision.json}}
+
+    - name: feature-preprocess
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: dataset}, {name: strategy}, {name: duration-seconds}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [feature-preprocess, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.dataset}}", "{{inputs.parameters.strategy}}", "{{inputs.parameters.duration-seconds}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: processedDataset, valueFrom: {path: /tmp/processedDataset.json}}]
+
+    - name: train-model
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: dataset}, {name: algorithm}, {name: epochs}, {name: learning-rate}, {name: resource-profile}, {name: duration-seconds}, {name: base-accuracy}, {name: base-f1}, {name: latency-ms}, {name: fail-mode}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [train-model, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.dataset}}", "{{inputs.parameters.algorithm}}", "{{inputs.parameters.epochs}}", "{{inputs.parameters.learning-rate}}", "{{inputs.parameters.resource-profile}}", "{{inputs.parameters.duration-seconds}}", "{{inputs.parameters.base-accuracy}}", "{{inputs.parameters.base-f1}}", "{{inputs.parameters.latency-ms}}", "{{inputs.parameters.fail-mode}}"]
+        resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: 500m, memory: 192Mi}}
+      outputs:
+        parameters: [{name: model, valueFrom: {path: /tmp/model.json}}]
+
+    - name: evaluate-model
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: model}, {name: dataset}, {name: accuracy-adjustment}, {name: duration-seconds}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [evaluate-model, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.model}}", "{{inputs.parameters.dataset}}", "{{inputs.parameters.accuracy-adjustment}}", "{{inputs.parameters.duration-seconds}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: evaluation, valueFrom: {path: /tmp/evaluation.json}}]
+
+    - name: compare-evaluations
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: evaluation-a}, {name: evaluation-b}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [compare-evaluations, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.evaluation-a}}", "{{inputs.parameters.evaluation-b}}"]
+        resources: *resources
+      outputs:
+        parameters:
+          - {name: candidate, valueFrom: {path: /tmp/candidate.json}}
+          - {name: leaderboard, valueFrom: {path: /tmp/leaderboard.json}}
+
+    - name: model-admission-gate
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: candidate}, {name: min-accuracy}, {name: min-f1}, {name: max-latency-ms}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [model-admission-gate, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.candidate}}", "{{inputs.parameters.min-accuracy}}", "{{inputs.parameters.min-f1}}", "{{inputs.parameters.max-latency-ms}}"]
+        resources: *resources
+      outputs:
+        parameters:
+          - {name: approvedCandidate, valueFrom: {path: /tmp/approvedCandidate.json}}
+          - {name: rejectedCandidate, valueFrom: {path: /tmp/rejectedCandidate.json}}
+          - {name: approvedDecision, valueFrom: {path: /tmp/approvedDecision.json}}
+          - {name: rejectedDecision, valueFrom: {path: /tmp/rejectedDecision.json}}
+          - {name: decision, valueFrom: {path: /tmp/decision.json}}
+
+    - name: register-model-version
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: candidate}, {name: version-alias}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [register-model-version, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.candidate}}", "{{inputs.parameters.version-alias}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: registeredModel, valueFrom: {path: /tmp/registeredModel.json}}]
+
+    - name: qualification-report
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: decision}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [qualification-report, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.decision}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: report, valueFrom: {path: /tmp/report.json}}]
