@@ -55,6 +55,26 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         incoming[edge.target].append(edge)
         parents[edge.target].add(edge.source)
 
+    inherited_conditions: dict[str, frozenset[str]] = {}
+
+    def branch_conditions(node_id: str) -> frozenset[str]:
+        if node_id in inherited_conditions:
+            return inherited_conditions[node_id]
+        expressions: set[str] = set()
+        for edge in incoming[node_id]:
+            source_definition = NODE_TYPES[nodes_by_id[edge.source].type]
+            condition = source_definition.get("branchConditions", {}).get(edge.sourcePort)
+            if condition:
+                expressions.add(
+                    f"{{{{tasks.{mapping[edge.source]}.outputs.parameters.{condition['output']}}}}} == {condition['value']}"
+                )
+            else:
+                expressions.update(branch_conditions(edge.source))
+        if len(expressions) > 1:
+            raise ValueError(f"Node '{node_id}' has incompatible branch conditions.")
+        inherited_conditions[node_id] = frozenset(expressions)
+        return inherited_conditions[node_id]
+
     dag_tasks: list[dict[str, Any]] = []
     wrappers: list[dict[str, Any]] = []
     for node in pipeline.spec.nodes:
@@ -79,18 +99,9 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
         }
         if parents[node.id]:
             task["dependencies"] = sorted(mapping[parent] for parent in parents[node.id])
-        branch_expressions: set[str] = set()
-        for edge in incoming[node.id]:
-            source_definition = NODE_TYPES[nodes_by_id[edge.source].type]
-            condition = source_definition.get("branchConditions", {}).get(edge.sourcePort)
-            if condition:
-                branch_expressions.add(
-                    f"{{{{tasks.{mapping[edge.source]}.outputs.parameters.{condition['output']}}}}} == {condition['value']}"
-                )
-        if len(branch_expressions) > 1:
-            raise ValueError(f"Node '{node.id}' has incompatible branch conditions.")
+        branch_expressions = branch_conditions(node.id)
         if branch_expressions:
-            task["when"] = branch_expressions.pop()
+            task["when"] = next(iter(branch_expressions))
         dag_tasks.append(task)
 
         execute = {

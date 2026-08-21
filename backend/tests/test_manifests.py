@@ -21,7 +21,7 @@ def test_workflow_template_is_fixed_whitelist() -> None:
     assert {item["name"] for item in document["spec"]["templates"]} == {
         "dataset-version", "data-profile", "data-quality-gate", "feature-preprocess", "train-model",
         "evaluate-model", "compare-evaluations", "model-admission-gate", "register-model-version",
-        "qualification-report",
+        "qualification-report", "inference-smoke-test", "deployment-handoff",
     }
     for template in document["spec"]["templates"]:
         assert template["container"]["image"] == "pipeline-demo-backend:0.1.0"

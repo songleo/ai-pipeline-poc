@@ -1,15 +1,17 @@
-# 训练—评测—准入演示指南
+# AI 评论分类 Pipeline 演示指南
 
-前置条件：完成 `make preflight && make bootstrap && make build && make deploy && make demo`，打开页面显示的前端地址。
+前置条件：完成 `make preflight && make bootstrap && make build && make deploy && make demo`，打开页面显示的前端地址。所有业务作业都是固定 sleep 与结构化模拟输出。
 
-1. 点击“加载示例”，介绍 13 节点闭环：版本化数据、画像、数据门禁、预处理、并行训练/评测、排行榜、模型门禁、登记或拒绝报告。
-2. 删除任意必填连线并点击“校验”，展示类型化端口和后端权威校验；随后恢复连线。
-3. 点击“运行”，观察基线与候选训练并行执行；点击训练节点查看参数、25/50/75/100% 日志、资源规格和 `ModelRef`。
-4. 运行完成后打开右侧“排行榜”，确认候选模型位于第一名；在“Lineage”查看 Dataset、Model、Evaluation、Candidate、Decision、RegisteredModel 和 Report 引用。
-5. 默认阈值下，模型门禁为 `APPROVED`：登记模型与通过报告成功，拒绝报告为 `SKIPPED`。
-6. 将“模型准入门禁”的 `minAccuracy` 改为 `0.99` 后重新运行：登记模型与通过报告变为 `SKIPPED`，拒绝报告成功，Workflow 本身仍为 `SUCCEEDED`。
-7. 把两个训练节点的 `durationSeconds` 改为 30；运行后停止其中一个节点，确认并行训练继续。Workflow 终态后从该节点重跑，确认只重跑它和下游。
-8. 把一个训练节点的 `failMode` 改为 `always`、`retryLimit` 设为 2，查看系统失败、自动重试与业务拒绝的区别。演示后改回 `never`。
-9. 查看 Pipeline JSON 和 Workflow YAML，确认只有固定 `templateRef`，不存在用户镜像、Shell、ServiceAccount 或原始 Argo YAML。
+1. 在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，介绍业务边界：人工收集和标注是上游资产准备，在线服务和反馈闭环是未来平台能力。
+2. 进入三栏编辑器：左侧是受控组件库，中间是 DAG，右侧是属性、输入、输出和运行详情。拖入节点并连线，确认端口类型不兼容时会被拒绝。
+3. 演示 15 节点业务链：已标注电商评论集、标签/隐私画像、数据质量门禁、清洗与三类数据集划分、BERT 与 RoBERTa 两路微调、独立测试集评测、排行榜、模型准入、登记、投诉评论推理冒烟、部署交接，以及通过/拒绝报告。
+4. 点击“保存版本”，返回列表确认浏览器原型版本增加；复制后得到独立可编辑定义。该存储只是 PoC，后续由平台存储适配器替换。
+5. 点击“校验”和“运行”，页面切换到独立运行视图。观察两路模型微调并行执行，点击节点查看日志、参数和小型结构化 Artifact。
+6. 运行完成后确认 RoBERTa 候选位于排行榜第一名；通用模型门禁检查 Accuracy、F1 和推理延迟。投诉召回率属于评论分类模板未来可以扩展的业务指标，不进入通用节点契约。
+7. 查看“投诉评论推理冒烟”输出：固定评论“客服一直不处理我的退款申请”模拟返回“投诉，置信度 0.96”。这不是真实模型推理。
+8. 查看“推理部署交接”输出：`DeploymentRequestRef.status=READY_FOR_PLATFORM`、`adapterContract=InferenceDeploymentAdapter/v1`、`executionMode=SIMULATED_HANDOFF`。它证明交接契约可走通，但不会创建服务。
+9. 将“评论分类模型准入”的 `minAccuracy` 改为 `0.99` 后重新运行：登记、推理冒烟和部署交接为 `SKIPPED`，拒绝报告成功，Workflow 本身仍为 `SUCCEEDED`。
+10. 把两个微调节点的 `durationSeconds` 改为 30；停止其中一个节点，确认并行分支继续。Workflow 终态后从该节点重跑，确认只重跑它和下游。
+11. 查看 Pipeline DSL 和 Workflow，确认只有固定 `templateRef`，不存在用户镜像、Shell、ServiceAccount 或原始 Argo YAML。
 
-机器回归：`make smoke` 验证通过/拒绝门禁与基础执行；`make node-smoke` 验证单节点停止、并行分支继续和局部重跑。
+机器回归：`make smoke` 验证通过/拒绝门禁、推理冒烟和部署交接；`make node-smoke` 验证单节点停止、并行分支继续和局部重跑。

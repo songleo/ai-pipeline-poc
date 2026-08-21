@@ -19,6 +19,8 @@ const registry = [
   definition('compare-evaluations', [port('evaluationA', 'EvaluationRef'), port('evaluationB', 'EvaluationRef')], [port('candidate', 'CandidateModelRef'), port('leaderboard', 'LeaderboardRef')]),
   definition('model-admission-gate', [port('candidate', 'CandidateModelRef')], [port('approvedCandidate', 'CandidateModelRef'), port('rejectedCandidate', 'CandidateModelRef'), port('approvedDecision', 'GateDecisionRef'), port('rejectedDecision', 'GateDecisionRef')]),
   definition('register-model-version', [port('candidate', 'CandidateModelRef')], [port('registeredModel', 'RegisteredModelRef')]),
+  definition('inference-smoke-test', [port('registeredModel', 'RegisteredModelRef')], [port('inferenceTest', 'InferenceTestRef')]),
+  definition('deployment-handoff', [port('registeredModel', 'RegisteredModelRef'), port('inferenceTest', 'InferenceTestRef')], [port('deploymentRequest', 'DeploymentRequestRef')]),
   definition('qualification-report', [port('decision', 'GateDecisionRef')], [port('report', 'ReportRef')]),
 ]
 
@@ -51,7 +53,7 @@ describe('Pipeline DSL tools', () => {
 
   it('loads the professional sample and round trips its layout', () => {
     const flow = pipelineToFlow(examplePipeline, registry)
-    expect(flow.nodes).toHaveLength(13); expect(flow.edges).toHaveLength(16)
+    expect(flow.nodes).toHaveLength(15); expect(flow.edges).toHaveLength(19)
     const result = flowToPipeline(examplePipeline.metadata.name, examplePipeline.metadata.experimentName, examplePipeline.metadata.tags, flow.nodes, flow.edges, 420)
     expect(result.spec.nodes.map(item => item.id)).toEqual(examplePipeline.spec.nodes.map(item => item.id))
     expect(result.uiLayout.nodes['train-baseline']).toEqual({ x: 930, y: 90 })

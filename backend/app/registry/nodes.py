@@ -85,8 +85,8 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         [port("dataset", "DatasetRef")], [port("processedDataset", "DatasetRef")], "feature-preprocess",
         {"strategy": "strategy", "durationSeconds": "duration-seconds"}, {"dataset": "dataset"}),
     "train-model": node(
-        "train-model", "模型训练", "记录算法、超参数和资源规格；可固定失败演示重试。", "训练",
-        {"algorithm": string("xgboost", values=["xgboost", "lightgbm", "mlp"]), "epochs": integer(40, 1, 500),
+        "train-model", "模型训练 / 微调", "模拟受控模型训练，记录算法、超参数和资源规格。", "训练",
+        {"algorithm": string("xgboost", values=["xgboost", "lightgbm", "bert-base-chinese", "roberta-wwm-ext", "macbert-base"]), "epochs": integer(40, 1, 500),
          "learningRate": number(0.05, 0.0001, 1), "resourceProfile": string("cpu-small", values=["cpu-small", "cpu-medium", "gpu-demo"]),
          "durationSeconds": integer(8, 1, 120), "baseAccuracy": number(0.88), "baseF1": number(0.84),
          "latencyMs": number(36, 1, 10000), "retryLimit": integer(2, 0, 5), "failMode": string("never", values=["never", "always"])},
@@ -118,6 +118,22 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         {"versionAlias": string("candidate", maximum=30)}, [port("candidate", "CandidateModelRef")],
         [port("registeredModel", "RegisteredModelRef")], "register-model-version",
         {"versionAlias": "version-alias"}, {"candidate": "candidate"}),
+    "inference-smoke-test": node(
+        "inference-smoke-test", "推理冒烟测试", "使用固定样本模拟推理输出，验证登记模型可进入服务化阶段。", "评测",
+        {"inputSample": string("sample payload", maximum=100),
+         "expectedOutput": string("expected", maximum=40),
+         "durationSeconds": integer(2, 0, 60)}, [port("registeredModel", "RegisteredModelRef")],
+        [port("inferenceTest", "InferenceTestRef")], "inference-smoke-test",
+        {"inputSample": "input-sample", "expectedOutput": "expected-output", "durationSeconds": "duration-seconds"},
+        {"registeredModel": "registered-model"}),
+    "deployment-handoff": node(
+        "deployment-handoff", "推理部署交接", "生成受控部署申请，作为未来 ai-platform 推理服务适配器的输入。", "发布",
+        {"environment": string("staging", values=["staging", "production"]),
+         "resourceProfile": string("cpu-small", values=["cpu-small", "cpu-medium", "gpu-demo"]),
+         "replicas": integer(1, 1, 5)}, [port("registeredModel", "RegisteredModelRef"), port("inferenceTest", "InferenceTestRef")],
+        [port("deploymentRequest", "DeploymentRequestRef")], "deployment-handoff",
+        {"environment": "environment", "resourceProfile": "resource-profile", "replicas": "replicas"},
+        {"registeredModel": "registered-model", "inferenceTest": "inference-test"}),
     "qualification-report": node(
         "qualification-report", "生成资格报告", "根据门禁决策生成通过或拒绝报告。", "报告", {},
         [port("decision", "GateDecisionRef")], [port("report", "ReportRef")],

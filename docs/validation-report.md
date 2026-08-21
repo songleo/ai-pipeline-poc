@@ -227,3 +227,29 @@ Chrome 实际交互回归：
 ## 技术建议
 
 建议继续使用 Vue Flow + Argo。可复用边界是 DSL、Registry schema、校验器、Compiler 分层、状态模型、固定模板白名单和 API 契约；模拟脚本、单 Namespace、localStorage、端口转发和当前 RBAC/镜像布局只能作为演示实现。接入 ai-platform 前必须扫描其当前训练/评测/模型 API、鉴权、Namespace、配额、幂等和停止语义。
+
+## 2026-08-21 通用 Pipeline Studio 与评论分类模板
+
+本轮按评审意见保持产品能力通用：列表页、模板入口、三栏编辑器、运行视图、节点检查器、版本记录和运行历史不绑定具体业务。“小林的 AI 评论分类项目”只作为内置 Pipeline 模板，业务名称、样例文本和模型参数均保留在模板 DSL 中。新增通用“推理冒烟测试”和“推理部署交接”节点，以及尚未接入 `ai-platform` 的适配器协议边界；执行仍是 Kind 中固定白名单模板和 sleep 模拟。
+
+静态验证结果：
+
+```text
+backend pytest: 30 passed
+frontend Vitest: 8 passed
+frontend vue-tsc: passed
+frontend production build: passed
+```
+
+首次完整 smoke 暴露了拒绝分支缺陷：模型登记被门禁跳过后，推理冒烟仍解析其缺失输出，Workflow `training-qualification-rejected-qg2h8` 达到 `ERROR`。编译器随后增加门禁条件向后继节点的安全传播，并新增断言覆盖登记、推理冒烟和部署交接的同一准入条件；修复后的后端测试 30/30 通过。
+
+修复镜像重新构建并加载到 `kind-pipeline-demo`，后端显式滚动更新。最终验证结果：
+
+- 主流程 `comment-classification-demo-spclf` 为 `SUCCEEDED`，推理冒烟和部署交接均成功。
+- 拒绝流程 `training-qualification-rejected-w4dx2` 为 `SUCCEEDED`，登记、推理冒烟和部署交接均为 `SKIPPED`，没有被误报成系统错误。
+- 固定失败重试流程 `comment-classification-demo-rc2ft` 按预期为 `FAILED`；手动停止流程 `comment-classification-demo-htws6` 为 `CANCELLED`。
+- `scripts/smoke-test.sh` 退出码 0，覆盖健康检查、Registry、校验、通过/拒绝门禁、并行训练、推理冒烟、部署交接、日志、重试和手动停止。
+- 节点控制流程 `node-control-smoke-4kbfc` 退出码 0：基线训练独立停止且未自动重试，候选训练继续，随后从选定分支重跑成功。
+- `pipeline-demo-backend` 与 `pipeline-demo-frontend` 均为 `1/1 Available`；`/api/health` 返回 `status=ok`，前端返回 HTTP 200。
+
+Chrome 自动交互回归本轮未完成，不能记为通过。诊断确认 Chrome 已安装，但当前 Windows 用户下浏览器扩展数据目录不存在，且 `HKCU` 下 Native Messaging Host 注册项与清单文件缺失，因此可信控制通道不可用。需从 Codex/ChatGPT 插件界面重新安装 Browser 插件并确认 Chrome 扩展启用后，再补做拖拽、连线、模板运行和版本保存的 Chrome 实际交互回归。

@@ -9,10 +9,10 @@
   "apiVersion": "demo.pipeline.io/v1alpha1",
   "kind": "Pipeline",
   "metadata": {
-    "name": "training-qualification-demo",
-    "experimentName": "客户流失模型资格评审",
+    "name": "comment-classification-demo",
+    "experimentName": "小林的 AI 评论分类项目",
     "scenario": "training-evaluation-admission",
-    "tags": ["p0", "qualification"]
+    "tags": ["poc", "nlp", "comment-classification"]
   },
   "spec": {
     "nodes": [],
@@ -37,7 +37,7 @@ Edge 必须同时声明源/目标端口：
 
 ## 类型系统
 
-当前端口类型覆盖 `DatasetRef`、`DataProfileRef`、`ModelRef`、`EvaluationRef`、`CandidateModelRef`、`LeaderboardRef`、`GateDecisionRef`、`RegisteredModelRef` 和 `ReportRef`。只有完全相同类型可以连接。参数使用 Registry 的 JSON Schema 子集，后端是最终权威校验方。
+当前端口类型覆盖 `DatasetRef`、`DataProfileRef`、`ModelRef`、`EvaluationRef`、`CandidateModelRef`、`LeaderboardRef`、`GateDecisionRef`、`RegisteredModelRef`、`InferenceTestRef`、`DeploymentRequestRef` 和 `ReportRef`。只有完全相同类型可以连接。参数使用 Registry 的 JSON Schema 子集，后端是最终权威校验方。
 
 ## 参数传递
 

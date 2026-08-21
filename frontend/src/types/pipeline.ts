@@ -24,3 +24,6 @@ export interface RunNode {
   controlState?: 'STOP_REQUESTED'; canStop: boolean; canRerun: boolean
 }
 export interface RunDetail { workflowName: string; pipelineName: string; experimentName?: string; scenario?: string; tags: string[]; status: UnifiedStatus; startedAt?: string; finishedAt?: string; message?: string; nodes: RunNode[] }
+export interface PipelineCatalogEntry {
+  id: string; name: string; description: string; version: number; source: 'template' | 'local'; updatedAt: string; pipeline: Pipeline
+}

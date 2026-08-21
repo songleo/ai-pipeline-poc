@@ -54,6 +54,6 @@ while (( SECONDS < deadline )); do
   sleep 2
 done
 jq -e --arg started "$train_b_started" '(.status=="SUCCEEDED") and (.nodes[] | select(.nodeId=="train-candidate") | .startedAt==$started)' <<<"$run" >/dev/null
-jq -e '.nodes[] | select(.nodeId=="train-baseline" or .nodeId=="leaderboard" or .nodeId=="admission" or .nodeId=="register") | .status=="SUCCEEDED"' <<<"$run" >/dev/null
+jq -e '.nodes[] | select(.nodeId=="train-baseline" or .nodeId=="leaderboard" or .nodeId=="admission" or .nodeId=="register" or .nodeId=="inference-smoke" or .nodeId=="deployment") | .status=="SUCCEEDED"' <<<"$run" >/dev/null
 
 echo "Node control smoke passed: baseline training stopped without retry, candidate training continued, and the selected branch reran successfully."

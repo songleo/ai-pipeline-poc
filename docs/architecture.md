@@ -3,7 +3,7 @@
 ## 组件关系
 
 ```text
-Vue Flow 编辑器
+Pipeline 列表 / 模板 / Vue Flow 三栏编辑器 / 独立运行视图
   │ Pipeline DSL / 状态、日志、输出
   ▼
 FastAPI ── Node Registry ── Validator ── Compiler
@@ -13,7 +13,7 @@ FastAPI ── Node Registry ── Validator ── Compiler
 Workflow CRD ── Argo Controller ── WorkflowTemplate ── Pods
 ```
 
-Node Registry 是节点类型、版本、参数 Schema、端口类型、模板名、默认重试和超时的唯一来源。浏览器从 `/api/node-types` 获取它，不复制业务定义。Validator 是最终权威；前端校验只用于即时反馈。Compiler 与路由分离，可以被单元测试和未来 Adapter 复用。
+Node Registry 是节点类型、版本、参数 Schema、端口类型、模板名、默认重试和超时的唯一来源。浏览器从 `/api/node-types` 获取它，不复制业务定义。Validator 是最终权威；前端校验只用于即时反馈。Compiler 与路由分离，可以被单元测试和未来 Adapter 复用。`backend/app/adapters/contracts.py` 定义了最小 `start/get/cancel` 能力契约和显式 project/tenant/actor 上下文；当前 Argo 执行器尚未实现该平台契约。
 
 ## 安全边界
 
@@ -33,7 +33,7 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 
 门禁节点是受控的特殊节点：固定模板输出 `APPROVED` 或 `REJECTED`，Registry 把业务输出端口映射成固定 Argo `when` 条件。用户不能提交表达式。未命中分支映射为 `SKIPPED`，因此业务拒绝仍可让 Workflow 正常成功，并与容器失败、系统错误区分。
 
-预处理完成后两个训练 task 仅依赖 preprocess，因此可以并行；compare 同时依赖两者，report 依赖 compare。
+评论数据预处理完成后两个微调 task 仅依赖 preprocess，因此可以并行；compare 同时依赖两路评测。准入通过后登记模型，推理冒烟验证结构化预测，再由部署交接节点生成 `DeploymentRequestRef`。交接节点不创建推理服务，只证明未来 `InferenceDeploymentAdapter/v1` 的输入可由 Pipeline 产出。
 
 ## 状态、日志和输出链路
 
@@ -54,4 +54,4 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 
 ## 数据边界
 
-本 PoC 使用小型类型化 JSON 引用演示 Dataset、Model、Evaluation、Decision、Report 和单次运行 Lineage。它不适合传递真实数据集或模型；后续应传资源 ID、对象存储 URI，或使用 PVC/Argo Artifact。参数大小、Kubernetes 对象大小、Lineage 保留和日志保存都不是生产级 Artifact 通道。
+本 PoC 使用小型类型化 JSON 引用演示 Dataset、Model、Evaluation、Decision、InferenceTest、DeploymentRequest、Report 和单次运行 Lineage。它不适合传递真实数据集或模型；后续应传资源 ID、对象存储 URI，或使用 PVC/Argo Artifact。参数大小、Kubernetes 对象大小、Lineage 保留和日志保存都不是生产级 Artifact 通道。

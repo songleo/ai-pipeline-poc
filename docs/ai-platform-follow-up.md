@@ -9,6 +9,8 @@
 - 独立 Compiler 接口、安全 task 名映射、统一运行/节点状态模型。
 - 前端轮询、状态着色、日志/输出抽屉的交互骨架。
 - WorkflowTemplate 白名单、禁止任意镜像/Shell/ServiceAccount 的安全边界。
+- Pipeline 列表、模板、三栏编辑器和独立运行视图的前端组件边界。
+- `PipelineCapabilityAdapter` 的 `start/get/cancel` 形状、幂等请求与显式平台上下文。
 
 ## 仅演示代码
 
@@ -24,7 +26,7 @@ Registry 应变成平台能力目录的受控投影：节点类型映射训练�
 - 平台只提供稳定、幂等、可查询/可取消的服务 API 时，使用 HTTP Adapter。
 - 不应仅为 Pipeline 强行复制一套 CRD。选择必须基于平台实际 API/CRD、错误模型、身份传递和停止语义的代码证据。
 
-Adapter 至少实现 `submit(idempotencyKey)`、`getStatus(externalId)`、`getOutputs(externalId)`、`cancel(externalId)`。Workflow retry 会重复调用，所以平台创建 API 必须使用由 run ID + node ID 导出的幂等键；重试前先查询已存在外部任务。
+Adapter 至少实现 `start(context, request)`、`get(context, externalId)`、`cancel(context, externalId)`；`CapabilityRun` 同时返回统一状态和类型化输出。Workflow retry 会重复调用，所以平台创建 API 必须使用由 run ID + node ID 导出的幂等键；重试前先查询已存在外部任务。当前 Python Protocol 是待验证设计，不代表 ai-platform 已提供对应接口。
 
 ## 停止与恢复
 

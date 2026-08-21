@@ -1,6 +1,6 @@
 # pipeline-demo
 
-`pipeline-demo` 是一个独立的可视化 AI Pipeline PoC，演示“数据版本 → 数据质量 → 并行训练 → 模型评测 → 排行榜 → 准入门禁 → 模型登记/拒绝报告”的专业闭环。它不接入 `ai-platform`，由 FastAPI 后端直接把受控 DSL 编译为 Argo Workflow，也不允许浏览器直接访问 Kubernetes。
+`pipeline-demo` 是一个通用、独立的可视化 AI Pipeline PoC；编辑器、Registry、DSL 和运行视图不绑定具体业务。内置的“小林的 AI 评论分类项目”只是一份业务模板，用来演示“数据 → 训练/微调 → 评测 → 准入 → 模型登记 → 推理冒烟 → 部署交接”闭环。它不接入 `ai-platform`，由 FastAPI 后端直接把受控 DSL 编译为 Argo Workflow，也不允许浏览器直接访问 Kubernetes。
 
 ## 架构简介
 
@@ -54,11 +54,11 @@ npm run dev
 
 镜像构建默认使用清华 PyPI 与 npmmirror，不修改系统全局配置；可通过 `PIP_INDEX_URL` 和 `NPM_REGISTRY` 为单次命令覆盖。后端本地开发也可使用：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[dev]'`。
 
-前端开发服务器把 `/api` 代理到 `localhost:8000`。Pipeline 可保存到浏览器 localStorage。Node Registry 只由后端维护，前端动态生成面板、端口和参数表单。
+前端开发服务器把 `/api` 代理到 `localhost:8000`。Pipeline 列表和版本在 PoC 阶段保存到浏览器 localStorage；正式集成时应替换为平台存储适配器。Node Registry 只由后端维护，前端动态生成组件库、类型化端口和参数表单。
 
 ## 演示与测试
 
-在页面点击“加载示例”，然后“校验”和“运行”。默认示例包含 13 个可编排节点、两个真实条件门禁、并行训练/评测、模型排行榜、模拟模型版本登记和 Artifact Lineage 视图。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
+在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，然后点击“校验”和“运行”。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
 
 ```bash
 make test
@@ -88,7 +88,7 @@ make clean
 
 ## 当前限制
 
-本 PoC 的 Dataset/Model/Evaluation/Report 都是小型结构化引用，Lineage 也是本次 Workflow 内的演示视图；真实数据和模型仍必须改用资源 ID、对象存储 URI、PVC 或 Argo Artifact。CPU/内存由固定 Pod resources 约束，`gpu-demo` 只展示模拟规格，不请求真实 GPU。当前没有登录、多租户、数据库、真实训练、持久化 Artifact Metadata、WebSocket 日志、定时/循环/子 Pipeline、任意镜像或 Shell、跨集群和生产级高可用。
+本 PoC 的 Dataset/Model/Evaluation/InferenceTest/DeploymentRequest/Report 都是小型结构化引用，所有业务任务只是固定 sleep 与模拟 JSON；没有真实评论、模型文件或推理服务。Lineage 也只属于本次 Workflow。真实接入必须改用平台资源 ID、对象存储 URI、PVC 或 Argo Artifact。CPU/内存由固定 Pod resources 约束，`gpu-demo` 只展示模拟规格，不请求真实 GPU。当前没有登录、多租户、数据库、真实训练、持久化 Artifact Metadata、WebSocket 日志、定时/循环/子 Pipeline、任意镜像或 Shell、跨集群和生产级高可用。
 
 ## 官方版本依据
 

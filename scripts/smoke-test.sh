@@ -47,12 +47,16 @@ r=json.loads(sys.argv[1]); nodes={n['nodeId']:n for n in r['nodes']}
 a,b=nodes['train-baseline'],nodes['train-candidate']
 assert a['startedAt'] < b['finishedAt'] and b['startedAt'] < a['finishedAt'], 'training intervals did not overlap'
 assert nodes['register']['status']=='SUCCEEDED'
+assert nodes['inference-smoke']['status']=='SUCCEEDED'
+assert nodes['deployment']['status']=='SUCCEEDED'
 assert nodes['approved-report']['status']=='SUCCEEDED'
 assert nodes['rejected-report']['status']=='SKIPPED'
 PY
 curl -fsS "$API_URL/api/runs/$workflow/nodes/train-baseline/logs" | grep -q 'training completed'
 curl -fsS "$API_URL/api/runs/$workflow/nodes/leaderboard/output" | grep -q 'LeaderboardRef'
 curl -fsS "$API_URL/api/runs/$workflow/nodes/admission/output" | grep -q 'APPROVED'
+curl -fsS "$API_URL/api/runs/$workflow/nodes/inference-smoke/output" | grep -q 'InferenceTestRef'
+curl -fsS "$API_URL/api/runs/$workflow/nodes/deployment/output" | grep -q 'READY_FOR_PLATFORM'
 
 python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/rejected.json" <<'PY'
 import json,sys
@@ -71,6 +75,8 @@ python3 - "$rejected_run" <<'PY'
 import json,sys
 nodes={item["nodeId"]:item for item in json.loads(sys.argv[1])["nodes"]}
 assert nodes["register"]["status"] == "SKIPPED"
+assert nodes["inference-smoke"]["status"] == "SKIPPED"
+assert nodes["deployment"]["status"] == "SKIPPED"
 assert nodes["approved-report"]["status"] == "SKIPPED"
 assert nodes["rejected-report"]["status"] == "SUCCEEDED"
 PY
@@ -108,4 +114,4 @@ wait_for_status "$stopped_workflow" RUNNING 90 >/dev/null
 curl -fsS -X POST "$API_URL/api/runs/$stopped_workflow/stop" | grep -q 'CANCELLED'
 wait_for_status "$stopped_workflow" CANCELLED 90 >/dev/null
 
-echo "Smoke test passed: health, registry, validation, approved/rejected gates, parallel training, leaderboard, logs, retries, and manual stop."
+echo "Smoke test passed: health, registry, validation, approved/rejected gates, parallel training, inference smoke, deployment handoff, logs, retries, and manual stop."

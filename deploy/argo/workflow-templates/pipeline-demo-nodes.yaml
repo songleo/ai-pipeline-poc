@@ -149,3 +149,27 @@ spec:
         resources: *resources
       outputs:
         parameters: [{name: report, valueFrom: {path: /tmp/report.json}}]
+
+    - name: deployment-handoff
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: registered-model}, {name: inference-test}, {name: environment}, {name: resource-profile}, {name: replicas}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [deployment-handoff, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.registered-model}}", "{{inputs.parameters.inference-test}}", "{{inputs.parameters.environment}}", "{{inputs.parameters.resource-profile}}", "{{inputs.parameters.replicas}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: deploymentRequest, valueFrom: {path: /tmp/deploymentRequest.json}}]
+
+    - name: inference-smoke-test
+      inputs:
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: registered-model}, {name: input-sample}, {name: expected-output}, {name: duration-seconds}]
+      retryStrategy: *retry
+      container:
+        image: pipeline-demo-backend:0.1.0
+        command: [python, -m, app.workflow_nodes]
+        args: [inference-smoke-test, "{{inputs.parameters.node-id}}", "{{inputs.parameters.workflow-name}}", "{{inputs.parameters.registered-model}}", "{{inputs.parameters.input-sample}}", "{{inputs.parameters.expected-output}}", "{{inputs.parameters.duration-seconds}}"]
+        resources: *resources
+      outputs:
+        parameters: [{name: inferenceTest, valueFrom: {path: /tmp/inferenceTest.json}}]

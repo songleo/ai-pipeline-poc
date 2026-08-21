@@ -11,6 +11,7 @@ export const api = {
   validate: (pipeline: Pipeline) => request<ValidationResult>('/api/pipelines/validate', { method: 'POST', body: JSON.stringify(pipeline) }),
   compile: (pipeline: Pipeline) => request<{ workflow: Record<string, unknown>; yaml: string }>('/api/pipelines/compile', { method: 'POST', body: JSON.stringify(pipeline) }),
   run: (pipeline: Pipeline) => request<{ workflowName: string; status: string }>('/api/runs', { method: 'POST', body: JSON.stringify(pipeline) }),
+  runs: () => request<RunDetail[]>('/api/runs'),
   runDetail: (name: string) => request<RunDetail>(`/api/runs/${encodeURIComponent(name)}`),
   stop: (name: string) => request<{ workflowName: string; status: string; message: string }>(`/api/runs/${encodeURIComponent(name)}/stop`, { method: 'POST' }),
   stopNode: (name: string, nodeId: string) => request<{ workflowName: string; nodeId: string; status: string; controlState: string; message: string }>(`/api/runs/${encodeURIComponent(name)}/nodes/${encodeURIComponent(nodeId)}/stop`, { method: 'POST' }),

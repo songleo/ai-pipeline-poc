@@ -18,12 +18,12 @@ def tasks(workflow: dict) -> dict[str, dict]:
 
 def test_compiles_professional_workflow_metadata() -> None:
     workflow = compile_pipeline(pipeline(), run_id="goldenrun001")
-    assert workflow["metadata"]["generateName"] == "training-qualification-demo-"
+    assert workflow["metadata"]["generateName"] == "comment-classification-demo-"
     assert workflow["metadata"]["namespace"] == "pipeline-demo"
     assert workflow["spec"]["serviceAccountName"] == "pipeline-demo-workflow"
     assert workflow["spec"]["activeDeadlineSeconds"] == 420
-    assert workflow["metadata"]["annotations"]["demo.pipeline.io/experiment"] == "客户流失模型资格评审"
-    assert json.loads(workflow["metadata"]["annotations"]["demo.pipeline.io/tags"]) == ["p0", "classification", "qualification"]
+    assert workflow["metadata"]["annotations"]["demo.pipeline.io/experiment"] == "小林的 AI 评论分类项目"
+    assert json.loads(workflow["metadata"]["annotations"]["demo.pipeline.io/tags"]) == ["poc", "nlp", "comment-classification"]
 
 
 def test_parallel_training_evaluation_and_fan_in() -> None:
@@ -31,6 +31,8 @@ def test_parallel_training_evaluation_and_fan_in() -> None:
     assert compiled["train-baseline"]["dependencies"] == ["preprocess"]
     assert compiled["train-candidate"]["dependencies"] == ["preprocess"]
     assert compiled["leaderboard"]["dependencies"] == ["eval-baseline", "eval-candidate"]
+    assert compiled["inference-smoke"]["dependencies"] == ["register"]
+    assert compiled["deployment"]["dependencies"] == ["inference-smoke", "register"]
     args = {item["name"]: item["value"] for item in compiled["leaderboard"]["arguments"]["parameters"]}
     assert args["evaluation-a"] == "{{tasks.eval-baseline.outputs.parameters.evaluation}}"
     assert args["evaluation-b"] == "{{tasks.eval-candidate.outputs.parameters.evaluation}}"
@@ -40,6 +42,8 @@ def test_gate_edges_compile_to_real_argo_conditions() -> None:
     compiled = tasks(compile_pipeline(pipeline(), run_id="test"))
     assert compiled["preprocess"]["when"] == "{{tasks.data-gate.outputs.parameters.decision}} == APPROVED"
     assert compiled["register"]["when"] == "{{tasks.admission.outputs.parameters.decision}} == APPROVED"
+    assert compiled["inference-smoke"]["when"] == "{{tasks.admission.outputs.parameters.decision}} == APPROVED"
+    assert compiled["deployment"]["when"] == "{{tasks.admission.outputs.parameters.decision}} == APPROVED"
     assert compiled["approved-report"]["when"] == "{{tasks.admission.outputs.parameters.decision}} == APPROVED"
     assert compiled["rejected-report"]["when"] == "{{tasks.admission.outputs.parameters.decision}} == REJECTED"
 

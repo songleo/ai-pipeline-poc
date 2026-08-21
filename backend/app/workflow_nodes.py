@@ -145,6 +145,35 @@ def register_model_version(node: str, workflow: str, args: list[str]) -> None:
     print(f"[{node}] registered={registered['id']} alias={alias} mode=SIMULATED", flush=True)
 
 
+def inference_smoke_test(node: str, workflow: str, args: list[str]) -> None:
+    registered, input_sample, expected_output, duration = load(args[0]), args[1], args[2], args[3]
+    controlled_sleep(workflow, node, float(duration))
+    result = {"kind": "InferenceTestRef", "id": ref_id("inference-test", registered["id"], input_sample),
+              "modelVersionId": registered["id"], "input": input_sample, "output": expected_output, "confidence": 0.96,
+              "expectedOutput": expected_output, "passed": True, "executionMode": "SIMULATED"}
+    write("inferenceTest", result)
+    print(f"[{node}] output={result['output']} confidence={result['confidence']} passed={result['passed']}", flush=True)
+
+
+def deployment_handoff(node: str, workflow: str, args: list[str]) -> None:
+    ensure_node_running(workflow, node)
+    registered, inference_test, environment, resource_profile, replicas = load(args[0]), load(args[1]), args[2], args[3], int(args[4])
+    request = {
+        "kind": "DeploymentRequestRef",
+        "id": ref_id("deployment-request", registered["id"], environment, resource_profile, replicas),
+        "modelVersionId": registered["id"],
+        "inferenceTestId": inference_test["id"],
+        "environment": environment,
+        "resourceProfile": resource_profile,
+        "replicas": replicas,
+        "status": "READY_FOR_PLATFORM",
+        "adapterContract": "InferenceDeploymentAdapter/v1",
+        "executionMode": "SIMULATED_HANDOFF",
+    }
+    write("deploymentRequest", request)
+    print(f"[{node}] request={request['id']} status=READY_FOR_PLATFORM mode=SIMULATED", flush=True)
+
+
 def qualification_report(node: str, workflow: str, args: list[str]) -> None:
     ensure_node_running(workflow, node)
     decision = load(args[0])
@@ -159,7 +188,9 @@ OPERATIONS = {
     "dataset-version": dataset_version, "data-profile": data_profile, "data-quality-gate": data_quality_gate,
     "feature-preprocess": feature_preprocess, "train-model": train_model, "evaluate-model": evaluate_model,
     "compare-evaluations": compare_evaluations, "model-admission-gate": model_admission_gate,
-    "register-model-version": register_model_version, "qualification-report": qualification_report,
+    "register-model-version": register_model_version, "inference-smoke-test": inference_smoke_test,
+    "deployment-handoff": deployment_handoff,
+    "qualification-report": qualification_report,
 }
 
 

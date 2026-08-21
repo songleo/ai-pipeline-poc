@@ -15,7 +15,7 @@ function drag(event: DragEvent, type: string) {
 
 <template>
   <aside class="palette">
-    <h3>节点</h3>
+    <h3>组件库</h3>
     <section v-for="(items, category) in groups" :key="category">
       <div class="category-title">{{ category }}</div>
       <div v-for="item in items" :key="item.type" class="palette-item" draggable="true" @dragstart="drag($event, item.type)">
