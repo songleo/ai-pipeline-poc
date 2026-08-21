@@ -3,12 +3,28 @@ import os
 from datetime import datetime
 from typing import Any
 
+import requests
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
 
 
 GROUP, VERSION, PLURAL = "argoproj.io", "v1alpha1", "workflows"
 TERMINAL = {"SUCCEEDED", "FAILED", "ERROR", "CANCELLED"}
+CONTROL_ANNOTATION = "demo.pipeline.io/node-controls"
+CONTROL_STOP = "STOP_REQUESTED"
+
+
+class NodeControlError(RuntimeError):
+    pass
+
+
+def _node_controls(workflow: dict[str, Any]) -> dict[str, str]:
+    raw = workflow.get("metadata", {}).get("annotations", {}).get(CONTROL_ANNOTATION, "{}")
+    try:
+        controls = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return controls if isinstance(controls, dict) else {}
 
 
 def map_phase(phase: str | None, message: str = "", shutdown: str | None = None) -> str:
@@ -52,6 +68,8 @@ def _pod_name_matches(pod_name: str, argo_node_id: str | None) -> bool:
 def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
     metadata, spec, status = workflow.get("metadata", {}), workflow.get("spec", {}), workflow.get("status", {})
     mapping = json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/node-map", "{}"))
+    controls = _node_controls(workflow)
+    workflow_status = map_phase(status.get("phase"), status.get("message", ""), spec.get("shutdown"))
     statuses: dict[str, dict[str, Any]] = status.get("nodes", {}) or {}
     result_nodes = []
     for node_id, task_name in mapping.items():
@@ -61,26 +79,36 @@ def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
             task_name in value.get("name", "") or value.get("boundaryID") == primary_key
         )]
         pod_name = (pod_matches[-1][1].get("id") or pod_matches[-1][0]) if pod_matches else None
+        node_status = map_phase(primary.get("phase"), primary.get("message", ""), spec.get("shutdown"))
+        control_state = controls.get(node_id)
+        if control_state == CONTROL_STOP and node_status in {"FAILED", "ERROR"}:
+            node_status = "CANCELLED"
+        elif node_status not in {"PENDING", "RUNNING"}:
+            control_state = None
         result_nodes.append({
             "nodeId": node_id, "taskName": task_name,
-            "status": map_phase(primary.get("phase"), primary.get("message", ""), spec.get("shutdown")),
+            "status": node_status,
             "startedAt": primary.get("startedAt"), "finishedAt": primary.get("finishedAt"),
             "duration": _duration(primary.get("startedAt"), primary.get("finishedAt")),
             "message": primary.get("message"), "retryCount": max(0, len(pod_matches) - 1),
-            "podName": pod_name, "outputs": _outputs(primary),
+            "podName": pod_name, "outputs": _outputs(primary), "controlState": control_state,
+            "canStop": node_status in {"PENDING", "RUNNING"} and control_state != CONTROL_STOP,
+            "canRerun": workflow_status in TERMINAL and node_status in {"SUCCEEDED", "FAILED", "ERROR", "CANCELLED"},
         })
     return {
         "workflowName": metadata.get("name"),
         "pipelineName": metadata.get("labels", {}).get("demo.pipeline.io/pipeline"),
-        "status": map_phase(status.get("phase"), status.get("message", ""), spec.get("shutdown")),
+        "status": workflow_status,
         "startedAt": status.get("startedAt"), "finishedAt": status.get("finishedAt"),
         "message": status.get("message"), "nodes": result_nodes,
     }
 
 
 class KubernetesWorkflowClient:
-    def __init__(self, namespace: str | None = None) -> None:
+    def __init__(self, namespace: str | None = None, argo_url: str | None = None) -> None:
         self.namespace = namespace or os.getenv("PIPELINE_NAMESPACE", "pipeline-demo")
+        self.argo_url = (argo_url or os.getenv("ARGO_SERVER_URL", "http://argo-workflows-server.argo.svc:2746")).rstrip("/")
+        self.http = requests.Session()
         try:
             config.load_incluster_config()
         except config.ConfigException:
@@ -106,6 +134,75 @@ class KubernetesWorkflowClient:
         patched = self.custom.patch_namespaced_custom_object(GROUP, VERSION, self.namespace, PLURAL, name, {"spec": {"shutdown": "Terminate"}})
         return {"workflowName": name, "status": map_phase(patched.get("status", {}).get("phase"), shutdown="Terminate"), "message": "Termination requested."}
 
+    def node_control(self, name: str, node_id: str) -> dict[str, str | None]:
+        workflow = self.get(name)
+        mapping = json.loads(workflow.get("metadata", {}).get("annotations", {}).get("demo.pipeline.io/node-map", "{}"))
+        if node_id not in mapping:
+            raise KeyError(node_id)
+        return {"nodeId": node_id, "controlState": _node_controls(workflow).get(node_id)}
+
+    def stop_node(self, name: str, node_id: str) -> dict[str, str | None]:
+        workflow = self.get(name)
+        detail = workflow_detail(workflow)
+        node = next((item for item in detail["nodes"] if item["nodeId"] == node_id), None)
+        if not node:
+            raise KeyError(node_id)
+        if node["status"] not in {"PENDING", "RUNNING"}:
+            raise NodeControlError(f"Node {node_id} is already {node['status']}.")
+        controls = _node_controls(workflow)
+        controls[node_id] = CONTROL_STOP
+        self.custom.patch_namespaced_custom_object(
+            GROUP, VERSION, self.namespace, PLURAL, name,
+            {"metadata": {"annotations": {CONTROL_ANNOTATION: json.dumps(controls, separators=(",", ":"))}}},
+        )
+        return {"workflowName": name, "nodeId": node_id, "status": node["status"], "controlState": CONTROL_STOP, "message": "Node stop requested."}
+
+    def rerun_node(self, name: str, node_id: str) -> dict[str, str]:
+        workflow = self.get(name)
+        detail = workflow_detail(workflow)
+        node = next((item for item in detail["nodes"] if item["nodeId"] == node_id), None)
+        if not node:
+            raise KeyError(node_id)
+        if detail["status"] not in TERMINAL:
+            raise NodeControlError("Wait for the current workflow to reach a terminal state before rerunning a node.")
+        if node["status"] not in {"SUCCEEDED", "FAILED", "ERROR", "CANCELLED"}:
+            raise NodeControlError(f"Node {node_id} cannot be rerun from {node['status']}.")
+        controls = _node_controls(workflow)
+        original_control = controls.pop(node_id, None)
+        self.custom.patch_namespaced_custom_object(
+            GROUP, VERSION, self.namespace, PLURAL, name,
+            {"metadata": {"annotations": {CONTROL_ANNOTATION: json.dumps(controls, separators=(",", ":"))}}},
+        )
+        task_name = node["taskName"]
+        try:
+            response = self.http.put(
+                f"{self.argo_url}/api/v1/workflows/{self.namespace}/{name}/retry",
+                json={
+                    "name": name,
+                    "namespace": self.namespace,
+                    "nodeFieldSelector": f"displayName={task_name}",
+                    "restartSuccessful": True,
+                },
+                timeout=10,
+            )
+        except requests.RequestException as exc:
+            if original_control:
+                controls[node_id] = original_control
+            self.custom.patch_namespaced_custom_object(
+                GROUP, VERSION, self.namespace, PLURAL, name,
+                {"metadata": {"annotations": {CONTROL_ANNOTATION: json.dumps(controls, separators=(",", ":"))}}},
+            )
+            raise NodeControlError("Argo retry service is unavailable.") from exc
+        if not response.ok:
+            if original_control:
+                controls[node_id] = original_control
+            self.custom.patch_namespaced_custom_object(
+                GROUP, VERSION, self.namespace, PLURAL, name,
+                {"metadata": {"annotations": {CONTROL_ANNOTATION: json.dumps(controls, separators=(",", ":"))}}},
+            )
+            raise NodeControlError(f"Argo retry rejected the request ({response.status_code}): {response.text[:300]}")
+        return {"workflowName": name, "nodeId": node_id, "status": "PENDING", "message": "Node and its downstream nodes are scheduled to rerun."}
+
     def logs(self, workflow: dict[str, Any], node_id: str) -> str:
         detail = workflow_detail(workflow)
         node = next((item for item in detail["nodes"] if item["nodeId"] == node_id), None)
@@ -118,5 +215,5 @@ class KubernetesWorkflowClient:
         return self.core.read_namespaced_pod_log(pod.metadata.name, self.namespace, container="main")
 
 
-__all__ = ["ApiException", "KubernetesWorkflowClient", "map_phase", "workflow_detail"]
+__all__ = ["ApiException", "KubernetesWorkflowClient", "NodeControlError", "map_phase", "workflow_detail"]
 

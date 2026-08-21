@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { addEdge, type Connection, type Edge, type Node, type NodeTypesObject, useVueFlow, VueFlow } from '@vue-flow/core'
+import { type Connection, type Edge, type Node, type NodeTypesObject, useVueFlow, VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -11,7 +11,7 @@ import NodePalette from '../components/pipeline/NodePalette.vue'
 import PipelineNode from '../components/nodes/PipelineNode.vue'
 import type { NodeTypeDefinition, RunDetail, UnifiedStatus } from '../types/pipeline'
 import { examplePipeline } from '../utils/example'
-import { defaultParameters, flowToPipeline, pipelineToFlow, terminalStatuses, validateLocally, type PipelineNodeData } from '../utils/pipeline'
+import { appendFlowNode, connectFlowNodes, flowToPipeline, pipelineToFlow, terminalStatuses, validateLocally, type PipelineNodeData } from '../utils/pipeline'
 
 const registry = ref<NodeTypeDefinition[]>([])
 const flowNodes = shallowRef<Node<PipelineNodeData>[]>([])
@@ -27,6 +27,7 @@ const output = ref<Record<string, unknown>>({})
 const dialogOpen = ref(false)
 const dialogTitle = ref('')
 const dialogContent = ref('')
+const controlBusy = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const nodeTypes = { pipeline: markRaw(PipelineNode) } as unknown as NodeTypesObject
@@ -51,15 +52,14 @@ function onDrop(event: DragEvent) {
   event.preventDefault(); const type = event.dataTransfer?.getData('application/vueflow'); const definition = registry.value.find(item => item.type === type)
   if (!definition) return
   const position = screenToFlowCoordinate({ x: event.clientX, y: event.clientY }); const suffix = Math.random().toString(36).slice(2, 7); const id = `${type}-${suffix}`
-  flowNodes.value.push({ id, type: 'pipeline', position, data: { definition, status: 'IDLE', pipelineNode: { id, type: definition.type, version: definition.version, name: definition.displayName, parameters: defaultParameters(definition) } } })
+  flowNodes.value = appendFlowNode(flowNodes.value, definition, position, id)
 }
 function onConnect(connection: Connection) {
-  const source = flowNodes.value.find(item => item.id === connection.source); const target = flowNodes.value.find(item => item.id === connection.target)
-  const out = source?.data?.definition.outputPorts.find(item => item.name === connection.sourceHandle); const input = target?.data?.definition.inputPorts.find(item => item.name === connection.targetHandle)
-  if (!out || !input || out.type !== input.type) { ElMessage.error('端口类型不兼容'); return }
-  if (!input.multiple && flowEdges.value.some(edge => edge.target === connection.target && edge.targetHandle === connection.targetHandle)) { ElMessage.error('该输入端口只能连接一次'); return }
-  flowEdges.value = addEdge(connection, flowEdges.value) as Edge[]
+  const result = connectFlowNodes(flowNodes.value, flowEdges.value, connection)
+  if (result.error) { ElMessage.error(result.error); return }
+  flowEdges.value = result.edges
 }
+function refreshSelectedNode() { flowNodes.value = [...flowNodes.value] }
 async function selectNode(event: { node: Node<PipelineNodeData> }) {
   selectedId.value = event.node.id; drawerOpen.value = true; logs.value = ''; output.value = {}
   if (!workflowName.value) return
@@ -86,14 +86,32 @@ async function poll() {
   try {
     runDetail.value = await api.runDetail(workflowName.value)
     const statuses = new Map(runDetail.value.nodes.map(item => [item.nodeId, item.status]))
-    flowNodes.value.forEach(node => { if (node.data) node.data.status = statuses.get(node.id) ?? 'PENDING' })
-    flowEdges.value.forEach(edge => { edge.animated = statuses.get(edge.source) === 'RUNNING' })
+    flowNodes.value = flowNodes.value.map(node => node.data ? { ...node, data: { ...node.data, status: statuses.get(node.id) ?? 'PENDING' } } : node)
+    flowEdges.value = flowEdges.value.map(edge => ({ ...edge, animated: statuses.get(edge.source) === 'RUNNING' }))
     if (terminalStatuses.has(runDetail.value.status)) stopPolling()
   } catch (error) { stopPolling(); ElMessage.error(String(error)) }
 }
 function startPolling() { stopPolling(); pollTimer = setInterval(poll, 2000) }
 function stopPolling() { if (pollTimer) clearInterval(pollTimer); pollTimer = undefined }
 async function stopRun() { if (!workflowName.value) return; try { await api.stop(workflowName.value); await poll(); ElMessage.success('已请求立即停止') } catch (error) { ElMessage.error(String(error)) } }
+async function stopSelectedNode() {
+  if (!workflowName.value || !selectedId.value) return
+  controlBusy.value = true
+  try {
+    await api.stopNode(workflowName.value, selectedId.value)
+    await poll(); startPolling(); ElMessage.success('已请求停止此节点，并行分支不会受影响')
+  } catch (error) { ElMessage.error(String(error)) } finally { controlBusy.value = false }
+}
+async function rerunSelectedNode() {
+  if (!workflowName.value || !selectedId.value) return
+  const confirmed = await ElMessageBox.confirm('将重新运行此节点及其所有下游节点；其他已成功的并行分支保持不变。', '确认重新运行', { type: 'warning' }).catch(() => false)
+  if (!confirmed) return
+  controlBusy.value = true
+  try {
+    await api.rerunNode(workflowName.value, selectedId.value)
+    await poll(); startPolling(); ElMessage.success('已从此节点开始重新运行')
+  } catch (error) { ElMessage.error(String(error)) } finally { controlBusy.value = false }
+}
 function showPipelineJson() { dialogTitle.value = 'Pipeline JSON'; dialogContent.value = JSON.stringify(currentPipeline(), null, 2); dialogOpen.value = true }
 async function showWorkflowYaml() { try { const result = await api.compile(currentPipeline()); dialogTitle.value = 'Argo Workflow YAML'; dialogContent.value = result.yaml; dialogOpen.value = true } catch (error) { ElMessage.error(String(error)) } }
 function minimapColor(node: Node<PipelineNodeData>) { return ({ RUNNING: '#409eff', SUCCEEDED: '#67c23a', FAILED: '#f56c6c', ERROR: '#f56c6c', CANCELLED: '#606266', PENDING: '#e6a23c' } as Record<string, string>)[node.data?.status ?? 'IDLE'] ?? '#909399' }
@@ -126,7 +144,7 @@ onBeforeUnmount(stopPolling)
         </VueFlow>
       </div>
     </main>
-    <NodeConfigDrawer v-model="drawerOpen" :data="selectedNode?.data" :runtime="selectedRuntime" :logs="logs" :output="output" />
+    <NodeConfigDrawer v-model="drawerOpen" :data="selectedNode?.data" :runtime="selectedRuntime" :logs="logs" :output="output" :control-busy="controlBusy" @changed="refreshSelectedNode" @stop-node="stopSelectedNode" @rerun-node="rerunSelectedNode" />
     <el-dialog v-model="dialogOpen" :title="dialogTitle" width="72%"><pre class="json-dialog">{{ dialogContent }}</pre></el-dialog>
   </div>
 </template>

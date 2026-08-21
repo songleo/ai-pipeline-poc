@@ -59,7 +59,12 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
     for node in pipeline.spec.nodes:
         definition = NODE_TYPES[node.type]
         task_name = mapping[node.id]
-        argument_values: dict[str, str] = {"node-id": node.id}
+        retry_limit = int(node.parameters.get("retryLimit", definition["defaultRetryLimit"]))
+        argument_values: dict[str, str] = {
+            "node-id": node.id,
+            "workflow-name": "{{workflow.name}}",
+            "retry-limit": str(retry_limit),
+        }
         for param_name, template_param in definition.get("parameterMapping", {}).items():
             argument_values[template_param] = _value(node.parameters[param_name])
         for edge in incoming[node.id]:
@@ -80,7 +85,6 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
             "templateRef": {"name": definition["workflowTemplateName"], "template": definition["templateName"]},
             "arguments": {"parameters": [{"name": item["name"], "value": f"{{{{inputs.parameters.{item['name']}}}}}"} for item in inputs]},
         }
-        retry_limit = int(node.parameters.get("retryLimit", definition["defaultRetryLimit"]))
         wrapper: dict[str, Any] = {
             "name": f"node-{task_name}",
             "inputs": {"parameters": inputs},
@@ -88,7 +92,6 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
                 {"name": port["name"], "valueFrom": {"parameter": f"{{{{steps.execute.outputs.parameters.{port['name']}}}}}"}}
                 for port in definition["outputPorts"]
             ]},
-            "retryStrategy": {"limit": str(retry_limit), "retryPolicy": "Always"},
             "steps": [[execute]],
         }
         wrappers.append(wrapper)

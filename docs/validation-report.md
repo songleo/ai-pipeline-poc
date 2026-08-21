@@ -1,10 +1,10 @@
 # 验证报告
 
-更新时间：2026-08-20（Asia/Shanghai）
+更新时间：2026-08-21（Asia/Shanghai）
 
 ## 结论摘要
 
-PoC 已完成真实端到端验证。Vue Flow 能支持拖拽、连线、端口和动态配置；版本化 DSL 能表达示例 DAG；独立 Compiler 能生成 Argo Workflow；Kind 中的 Argo Workflows 实际完成串行、并行、参数传递、固定失败重试和手动停止；前后端 Deployment、节点状态、Pod 日志和最终输出查询均已跑通。
+PoC 已完成真实端到端验证。Vue Flow 能支持拖拽、连线、端口和动态配置；版本化 DSL 能表达示例 DAG；独立 Compiler 能生成 Argo Workflow；Kind 中的 Argo Workflows 实际完成串行、并行、参数传递、固定失败重试、整个流程停止、单节点停止和从节点重新运行；前后端 Deployment、节点状态、Pod 日志和最终输出查询均已跑通。
 
 建议继续采用“Vue Flow + 后端唯一 Node Registry + 版本化 DSL + 独立 Compiler + 固定 WorkflowTemplate + Argo”的方向进入下一阶段，但当前实现仍是单机 PoC，不是生产基线。
 
@@ -108,6 +108,60 @@ logs, output, fixed failure retries, and manual stop.
 
 此前本地浏览器实测完成：加载 6 节点示例、Vue Flow DAG、服务端校验、动态参数抽屉、Pipeline JSON 和 Workflow YAML。部署后从 Windows 通过当前 WSL IP `172.21.248.217` 验证：前端返回 200，后端返回 `{"status":"ok","version":"0.1.0"}`，Argo UI 返回 200。本机未启用 WSL localhost 自动转发，因此 Windows 需使用 `make demo` 输出的动态 WSL IP。前端每 2 秒轮询，终态停止轮询。
 
+### 2026-08-21 自编排拖放与连线回归
+
+问题根因是 `flowNodes` / `flowEdges` 使用 `shallowRef`，但节点拖放和锁定版 Vue Flow `addEdge()` 都会原地修改数组；相同数组引用不会触发画布更新。修复后，拖入节点和新增 Edge 均使用新数组引用，运行状态、Edge 动画和节点配置变更也显式触发画布更新；Handle 扩大到 14px 并强化了可见性。
+
+前端验证命令：
+
+```bash
+docker build --provenance=false --target test \
+  --build-arg NPM_REGISTRY=https://registry.npmmirror.com \
+  -t pipeline-demo-frontend-test:0.1.0 frontend
+```
+
+结果：`vue-tsc` 严格类型检查通过，Vite 生产构建通过，Vitest `6 passed`。新增用例覆盖节点拖入时的新数组引用、`生成数据.dataset -> 数据预处理.dataset` 成功连线、Edge 到 DSL 的端口映射、端口类型不兼容拒绝，以及单输入端口重复连线拒绝。
+
+Chrome 实际交互回归通过：点击“新建”，依次拖入“生成数据”和“数据预处理”，从生成数据的 `dataset: DatasetRef` 输出 Handle 拖到数据预处理同类型输入 Handle；画布 Edge 数为 1。Pipeline JSON 出现正确的 `sourcePort: dataset` 和 `targetPort: dataset`，页面前后端联合校验返回“校验通过”。
+
+修复镜像 `pipeline-demo-frontend:0.1.0` 已加载到 `kind-pipeline-demo` 并滚动更新，前后端 Deployment 均 `1/1 Available`。完整 smoke 中成功 Workflow `model-comparison-demo-8kxqx` 达到 `SUCCEEDED`；随后固定失败重试 Workflow `model-comparison-demo-g5cdc` 在脚本 180 秒上限内仍为 `RUNNING`，因此本轮完整 smoke 退出 1，不能记为完整通过。该结果与前端拖放/连线回归分开记录。
+
+原 WSL 5173 端口转发在长时间 smoke 后无响应。为避免关闭 WSL 或影响其他终端，使用同版本 `kindest/node:v1.33.1` 中的 kubectl 启动独立 Docker 转发容器 `pipeline-demo-frontend-forward-5174`；Windows 实测 `http://localhost:5174/` 返回 200，`http://localhost:5174/api/health` 返回 `{"status":"ok","version":"0.1.0"}`。
+
+### 2026-08-21 WSL 扩容与节点级控制回归
+
+按用户授权把 `%UserProfile%/.wslconfig` 从 1 CPU / 4GB / 2GB swap 调整为 8 CPU / 12GB / 4GB swap，并执行一次 WSL 整体重启。重启后实时读取为 `cpu=8`、内存约 `11Gi`、swap `4.0Gi`；`pipeline-demo-control-plane` 恢复为 Ready。前端曾因 CoreDNS 尚未 Ready 而先启动失败，DNS 就绪后仅滚动重启 `pipeline-demo-frontend` 即恢复。
+
+节点控制实现前先对 Argo Workflows v4.0.8 做真实 API 探针。对运行中的普通节点调用 `/stop` 并传 `nodeFieldSelector=displayName=train-a`，服务端拒绝并返回：`currently, set only targets suspend nodes`。因此没有把该接口误包装为普通节点停止，而是为固定内置节点增加协作式取消检查；控制状态持久化在 Workflow annotation，退出码 64 在容器模板的 retry expression 中排除。用户仍不能提交任意 selector、镜像、命令或 YAML。
+
+静态验证结果：
+
+```text
+backend: 25 passed
+frontend: Vitest 6 passed
+frontend: vue-tsc passed
+frontend: Vite production build passed (1588 modules transformed)
+git diff --check: passed（仅现有 CRLF 转换提示）
+```
+
+第一次节点停止探针 `node-control-e2e-frlc6` 发现 retry expression 放在 Steps 包装层时看不到 Pod 退出码，`train-a.retryCount=2`；该轮不计通过。随后把 retry strategy 移到固定 WorkflowTemplate 的容器层，并把受校验的 `retry-limit` 作为模板参数传入。
+
+修正后真实 Workflow `node-control-e2e-fixed-5bkjz` 的结构化结果：
+
+- `train-a` 与 `train-b` 同时进入 RUNNING 后，请求停止 `train-a`。
+- `train-a` 终态为 `CANCELLED`，`retryCount=0`，没有触发自动重试。
+- `train-b` 未受影响并达到 `SUCCEEDED`；其原始 `startedAt=2026-08-21T07:24:15Z`。
+- Workflow 先按 DAG 规则达到 `FAILED`，compare/report 为 SKIPPED。
+- 对 `train-a` 请求定向重新运行后，`train-a`、compare、report 重新执行并成功；`train-b.startedAt` 仍为 `2026-08-21T07:24:15Z`，证明并行成功分支没有重跑。
+- Workflow 最终达到 `SUCCEEDED`，report 返回 `ReportRef`。
+- 对已成功的 compare 再次请求重新运行后，仅 compare 和 report 进入 PENDING/RUNNING 并重新成功，上游生成、预处理和训练节点保持成功。
+
+新增 `make node-smoke`，用于自动断言上述“停止无自动重试、并行分支继续、从节点重跑下游”的闭环。实际运行退出码 0，Workflow 为 `node-control-smoke-pcsz4`，最终输出 `Node control smoke passed`。
+
+Chrome 页面回归也使用 30 秒双训练分支完成。页面中打开 `train-a` 的“运行”页签后，“停止此节点”可用；点击后立即显示 `控制请求=正在停止` 和“并行分支不会受影响”反馈。Workflow `model-comparison-demo-mf98c` 最终结构化结果为 `train-a=CANCELLED/retryCount=0`、`train-b=SUCCEEDED`、Workflow `FAILED`。另一个成功 Workflow `model-comparison-demo-dbx95` 中，从已成功的 `train-a` 点击“重新运行此节点”并确认后，页面正确显示 `train-a/compare/report=PENDING`、`train-b=SUCCEEDED`。默认 8 秒任务上也观察到停止请求与任务完成竞态；若任务先完成，最终状态保持 `SUCCEEDED`，当前后端不会继续把已终态节点显示为“正在停止”。
+
+最终部署检查：`pipeline-demo-control-plane Ready / Kubernetes v1.33.1`，`pipeline-demo-backend 1/1`，`pipeline-demo-frontend 1/1`，`/api/health` 返回 `status=ok`。
+
 ## 集成中发现并修复的问题
 
 - Ubuntu 官方源下载卡住：备份后切换清华 APT 镜像，33.6 MB 索引约 14 秒完成。
@@ -135,4 +189,3 @@ logs, output, fixed failure retries, and manual stop.
 ## 技术建议
 
 建议继续使用 Vue Flow + Argo。可复用边界是 DSL、Registry schema、校验器、Compiler 分层、状态模型、固定模板白名单和 API 契约；模拟脚本、单 Namespace、localStorage、端口转发和当前 RBAC/镜像布局只能作为演示实现。接入 ai-platform 前必须扫描其当前训练/评测/模型 API、鉴权、Namespace、配额、幂等和停止语义。
-

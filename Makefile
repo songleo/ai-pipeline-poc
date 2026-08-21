@@ -1,4 +1,4 @@
-.PHONY: preflight bootstrap build deploy demo smoke test clean
+.PHONY: preflight bootstrap build deploy demo smoke node-smoke test clean
 
 preflight:
 	bash scripts/preflight.sh
@@ -19,10 +19,12 @@ demo:
 smoke:
 	bash scripts/smoke-test.sh
 
+node-smoke:
+	bash scripts/node-control-smoke.sh
+
 test:
 	cd backend && PYTHONPATH=.:.deps python3 -m pytest
 	docker build --provenance=false --target test --build-arg "NPM_REGISTRY=$${NPM_REGISTRY:-https://registry.npmmirror.com}" -t pipeline-demo-frontend-test:0.1.0 frontend
 
 clean:
 	bash scripts/cleanup.sh
-

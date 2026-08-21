@@ -1,10 +1,51 @@
-import type { Edge, Node } from '@vue-flow/core'
+import { addEdge, type Connection, type Edge, type Node } from '@vue-flow/core'
 import type { NodeTypeDefinition, Pipeline, PipelineNode, UnifiedStatus, ValidationResult } from '../types/pipeline'
 
 export interface PipelineNodeData { definition: NodeTypeDefinition; pipelineNode: PipelineNode; status: UnifiedStatus }
+export interface ConnectFlowResult { edges: Edge[]; error?: string }
 
 export function defaultParameters(definition: NodeTypeDefinition): Record<string, unknown> {
   return Object.fromEntries(Object.entries(definition.parametersSchema.properties).flatMap(([key, value]) => value.default === undefined ? [] : [[key, value.default]]))
+}
+
+export function appendFlowNode(
+  nodes: Node<PipelineNodeData>[],
+  definition: NodeTypeDefinition,
+  position: { x: number; y: number },
+  id: string,
+): Node<PipelineNodeData>[] {
+  return [...nodes, {
+    id,
+    type: 'pipeline',
+    position,
+    data: {
+      definition,
+      status: 'IDLE',
+      pipelineNode: {
+        id,
+        type: definition.type,
+        version: definition.version,
+        name: definition.displayName,
+        parameters: defaultParameters(definition),
+      },
+    },
+  }]
+}
+
+export function connectFlowNodes(
+  nodes: Node<PipelineNodeData>[],
+  edges: Edge[],
+  connection: Connection,
+): ConnectFlowResult {
+  const source = nodes.find(item => item.id === connection.source)
+  const target = nodes.find(item => item.id === connection.target)
+  const output = source?.data?.definition.outputPorts.find(item => item.name === connection.sourceHandle)
+  const input = target?.data?.definition.inputPorts.find(item => item.name === connection.targetHandle)
+  if (!output || !input || output.type !== input.type) return { edges, error: '端口类型不兼容' }
+  if (!input.multiple && edges.some(edge => edge.target === connection.target && edge.targetHandle === connection.targetHandle)) {
+    return { edges, error: '该输入端口只能连接一次' }
+  }
+  return { edges: addEdge(connection, [...edges]) as Edge[] }
 }
 
 export function pipelineToFlow(pipeline: Pipeline, registry: NodeTypeDefinition[]): { nodes: Node<PipelineNodeData>[]; edges: Edge[] } {

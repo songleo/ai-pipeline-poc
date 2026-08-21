@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from kubernetes.client.exceptions import ApiException
 
 from app.compiler import compile_pipeline, validate_pipeline
-from app.kubernetes import KubernetesWorkflowClient, workflow_detail
+from app.kubernetes import KubernetesWorkflowClient, NodeControlError, workflow_detail
 from app.models.pipeline import Pipeline
 from app.registry import get_node_type, list_node_types
 
@@ -106,6 +106,40 @@ def node_output(workflow_name: str, node_id: str, kube: KubernetesWorkflowClient
     if not node:
         raise HTTPException(404, "Pipeline node not found")
     return {"nodeId": node_id, "outputs": node["outputs"]}
+
+
+@app.get("/api/internal/runs/{workflow_name}/nodes/{node_id}/control")
+def get_node_control(workflow_name: str, node_id: str, kube: KubernetesWorkflowClient = Depends(workflow_client)) -> dict:
+    try:
+        return kube.node_control(workflow_name, node_id)
+    except KeyError as exc:
+        raise HTTPException(404, "Pipeline node not found") from exc
+    except ApiException as exc:
+        raise _kube_error(exc) from exc
+
+
+@app.post("/api/runs/{workflow_name}/nodes/{node_id}/stop")
+def stop_node(workflow_name: str, node_id: str, kube: KubernetesWorkflowClient = Depends(workflow_client)) -> dict:
+    try:
+        return kube.stop_node(workflow_name, node_id)
+    except KeyError as exc:
+        raise HTTPException(404, "Pipeline node not found") from exc
+    except NodeControlError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ApiException as exc:
+        raise _kube_error(exc) from exc
+
+
+@app.post("/api/runs/{workflow_name}/nodes/{node_id}/rerun")
+def rerun_node(workflow_name: str, node_id: str, kube: KubernetesWorkflowClient = Depends(workflow_client)) -> dict:
+    try:
+        return kube.rerun_node(workflow_name, node_id)
+    except KeyError as exc:
+        raise HTTPException(404, "Pipeline node not found") from exc
+    except NodeControlError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ApiException as exc:
+        raise _kube_error(exc) from exc
 
 
 @app.post("/api/runs/{workflow_name}/stop")

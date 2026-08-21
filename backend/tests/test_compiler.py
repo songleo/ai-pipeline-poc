@@ -42,15 +42,19 @@ def test_parallel_dependencies_and_parameter_references() -> None:
     compare_args = {item["name"]: item["value"] for item in tasks["compare"]["arguments"]["parameters"]}
     assert compare_args == {
         "node-id": "compare",
+        "workflow-name": "{{workflow.name}}",
+        "retry-limit": "0",
         "model-a": "{{tasks.train-a.outputs.parameters.model}}",
         "model-b": "{{tasks.train-b.outputs.parameters.model}}",
     }
 
 
-def test_retry_strategy_and_fixed_template_whitelist() -> None:
+def test_retry_limit_and_fixed_template_whitelist() -> None:
     workflow = compile_pipeline(pipeline(), run_id="test")
     wrappers = {item["name"]: item for item in workflow["spec"]["templates"][1:]}
-    assert wrappers["node-train-a"]["retryStrategy"] == {"limit": "2", "retryPolicy": "Always"}
+    assert "retryStrategy" not in wrappers["node-train-a"]
+    train_args = {item["name"]: item["value"] for item in workflow["spec"]["templates"][0]["dag"]["tasks"][2]["arguments"]["parameters"]}
+    assert train_args["retry-limit"] == "2"
     ref = wrappers["node-train-a"]["steps"][0][0]["templateRef"]
     assert ref == {"name": "pipeline-demo-nodes", "template": "mock-training"}
     serialized = json.dumps(workflow)

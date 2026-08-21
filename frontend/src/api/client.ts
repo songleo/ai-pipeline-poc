@@ -13,6 +13,8 @@ export const api = {
   run: (pipeline: Pipeline) => request<{ workflowName: string; status: string }>('/api/runs', { method: 'POST', body: JSON.stringify(pipeline) }),
   runDetail: (name: string) => request<RunDetail>(`/api/runs/${encodeURIComponent(name)}`),
   stop: (name: string) => request<{ workflowName: string; status: string; message: string }>(`/api/runs/${encodeURIComponent(name)}/stop`, { method: 'POST' }),
+  stopNode: (name: string, nodeId: string) => request<{ workflowName: string; nodeId: string; status: string; controlState: string; message: string }>(`/api/runs/${encodeURIComponent(name)}/nodes/${encodeURIComponent(nodeId)}/stop`, { method: 'POST' }),
+  rerunNode: (name: string, nodeId: string) => request<{ workflowName: string; nodeId: string; status: string; message: string }>(`/api/runs/${encodeURIComponent(name)}/nodes/${encodeURIComponent(nodeId)}/rerun`, { method: 'POST' }),
   logs: (name: string, nodeId: string) => request<{ nodeId: string; logs: string }>(`/api/runs/${encodeURIComponent(name)}/nodes/${encodeURIComponent(nodeId)}/logs`),
   output: (name: string, nodeId: string) => request<{ nodeId: string; outputs: Record<string, unknown> }>(`/api/runs/${encodeURIComponent(name)}/nodes/${encodeURIComponent(nodeId)}/output`),
 }

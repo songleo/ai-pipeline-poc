@@ -37,7 +37,18 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 
 前端运行期间每 2 秒请求 run detail。后端从 Workflow `status.phase` 和 `status.nodes` 映射 `PENDING/RUNNING/SUCCEEDED/FAILED/ERROR/CANCELLED/SKIPPED`。点击节点后，后端用 Workflow 名和 node ID 映射到 task/Pod，通过 Pod Log API读取完整日志，并从 Argo node outputs 返回小型 JSON。
 
-停止调用对 Workflow status 的 `shutdown: Terminate` patch。终态后重复停止返回幂等结果，不删除 Workflow。
+顶部“停止”调用对整个 Workflow 的 `shutdown: Terminate` patch。终态后重复停止返回幂等结果，不删除 Workflow。
+
+## 节点级停止与重新运行
+
+节点代表一次可观察的执行尝试，不是常驻服务。当前 PoC 的控制语义如下：
+
+- `PENDING/RUNNING`：可请求“停止此节点”。内置节点每秒从后端读取一次由 Workflow annotation 持久化的控制状态；收到 `STOP_REQUESTED` 后以保留退出码 64 结束。
+- 退出码 64 在固定 WorkflowTemplate 的容器级 `retryStrategy.expression` 中被排除，因此人为停止不会消耗或触发自动重试；普通失败仍遵循节点的 `retryLimit`。
+- 被停止节点映射为 `CANCELLED`，依赖它的下游节点不运行；不依赖它的并行分支继续执行。
+- Workflow 到达终态后，可“重新运行此节点”。后端用编译器生成的安全 task 名调用 Argo 定向 retry，并开启 `restartSuccessful`；所选节点及下游重新执行，其他成功分支复用原结果。
+
+浏览器不能提交 node selector、容器、命令或 Argo YAML；后端只接受 Workflow 名和 Pipeline node ID，并通过服务端 node map 生成选择器。Argo v4 的 `stop + nodeFieldSelector` 只支持 suspend node，不能用于终止普通运行 Pod，因此本 PoC 对固定内置节点采用协作式停止。生产节点应提供同样的取消检查或适配器，并为外部训练系统实现明确的 cancel API、幂等键和检查点。
 
 ## 数据边界
 

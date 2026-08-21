@@ -22,7 +22,8 @@ body { margin: 0; overflow: hidden; }
 .pipeline-node.status-cancelled { border-color: #606266; background: #e4e7ed; }
 .node-category { color: #909399; font-size: 11px; }
 .node-type { margin-top: 4px; color: #606266; font-size: 11px; }
-.vue-flow__handle { width: 10px; height: 10px; background: #409eff; }
+.vue-flow__handle { width: 14px; height: 14px; z-index: 2; cursor: crosshair; border: 2px solid #fff; background: #409eff; box-shadow: 0 0 0 1px #337ecc; }
 .muted { color: #606266; }
+.node-actions { display: flex; gap: 8px; margin: 16px 0 8px; }
 .log-view,.json-dialog { max-height: 360px; overflow: auto; padding: 10px; border-radius: 5px; background: #18222d; color: #d7e1ea; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 5px #409eff22; } }

@@ -11,17 +11,24 @@ spec:
       inputs:
         parameters:
           - name: node-id
+          - name: workflow-name
+          - name: retry-limit
           - name: sample-count
           - name: feature-count
           - name: duration-seconds
+      retryStrategy:
+        limit: "{{inputs.parameters.retry-limit}}"
+        retryPolicy: Always
+        expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
-            import json,time
-            node="{{inputs.parameters.node-id}}"; duration=int("{{inputs.parameters.duration-seconds}}")
-            print(f"[{node}] data generation started",flush=True); time.sleep(duration)
+            import json
+            from app.node_control import controlled_sleep
+            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; duration=int("{{inputs.parameters.duration-seconds}}")
+            print(f"[{node}] data generation started",flush=True); controlled_sleep(workflow,node,duration)
             out={"kind":"DatasetRef","id":f"dataset-{node}","sampleCount":int("{{inputs.parameters.sample-count}}"),"featureCount":int("{{inputs.parameters.feature-count}}")}
             open('/tmp/dataset.json','w').write(json.dumps(out)); print(f"[{node}] generated samples={out['sampleCount']}",flush=True)
       outputs:
@@ -32,17 +39,24 @@ spec:
       inputs:
         parameters:
           - name: node-id
+          - name: workflow-name
+          - name: retry-limit
           - name: dataset
           - name: clean-ratio
           - name: duration-seconds
+      retryStrategy:
+        limit: "{{inputs.parameters.retry-limit}}"
+        retryPolicy: Always
+        expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
-            import json,time
-            node="{{inputs.parameters.node-id}}"; data=json.loads(r'''{{inputs.parameters.dataset}}''')
-            print(f"[{node}] preprocessing started",flush=True); time.sleep(int("{{inputs.parameters.duration-seconds}}"))
+            import json
+            from app.node_control import controlled_sleep
+            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; data=json.loads(r'''{{inputs.parameters.dataset}}''')
+            print(f"[{node}] preprocessing started",flush=True); controlled_sleep(workflow,node,int("{{inputs.parameters.duration-seconds}}"))
             data.update(id=f"processed-{node}",cleanRatio=float("{{inputs.parameters.clean-ratio}}"))
             open('/tmp/processed.json','w').write(json.dumps(data)); print(f"[{node}] preprocessing completed",flush=True)
       outputs:
@@ -53,22 +67,29 @@ spec:
       inputs:
         parameters:
           - name: node-id
+          - name: workflow-name
+          - name: retry-limit
           - name: dataset
           - name: algorithm
           - name: duration-seconds
           - name: accuracy
           - name: fail-mode
+      retryStrategy:
+        limit: "{{inputs.parameters.retry-limit}}"
+        retryPolicy: Always
+        expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
-            import json,sys,time
-            node="{{inputs.parameters.node-id}}"; algorithm="{{inputs.parameters.algorithm}}"; duration=int("{{inputs.parameters.duration-seconds}}")
+            import json,sys
+            from app.node_control import controlled_sleep
+            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; algorithm="{{inputs.parameters.algorithm}}"; duration=int("{{inputs.parameters.duration-seconds}}")
             print(f"[{node}] training started",flush=True); print(f"[{node}] algorithm={algorithm}",flush=True)
-            for p in (25,50,75): time.sleep(duration/4); print(f"[{node}] progress={p}%",flush=True)
+            for p in (25,50,75): controlled_sleep(workflow,node,duration/4); print(f"[{node}] progress={p}%",flush=True)
             if "{{inputs.parameters.fail-mode}}" == "always": print(f"[{node}] fixed failure requested",flush=True); sys.exit(42)
-            time.sleep(duration/4); out={"kind":"ModelMetricRef","id":f"model-{node}","algorithm":algorithm,"accuracy":float("{{inputs.parameters.accuracy}}")}
+            controlled_sleep(workflow,node,duration/4); out={"kind":"ModelMetricRef","id":f"model-{node}","algorithm":algorithm,"accuracy":float("{{inputs.parameters.accuracy}}")}
             open('/tmp/model.json','w').write(json.dumps(out)); print(f"[{node}] accuracy={out['accuracy']}",flush=True); print(f"[{node}] training completed",flush=True)
       outputs:
         parameters:
@@ -78,15 +99,22 @@ spec:
       inputs:
         parameters:
           - name: node-id
+          - name: workflow-name
+          - name: retry-limit
           - name: model-a
           - name: model-b
+      retryStrategy:
+        limit: "{{inputs.parameters.retry-limit}}"
+        retryPolicy: Always
+        expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
             import json
-            node="{{inputs.parameters.node-id}}"; models=[json.loads(r'''{{inputs.parameters.model-a}}'''),json.loads(r'''{{inputs.parameters.model-b}}''')]
+            from app.node_control import ensure_node_running
+            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; ensure_node_running(workflow,node); models=[json.loads(r'''{{inputs.parameters.model-a}}'''),json.loads(r'''{{inputs.parameters.model-b}}''')]
             best=max(models,key=lambda item:item['accuracy']); open('/tmp/best.json','w').write(json.dumps(best)); print(f"[{node}] best={best['id']} accuracy={best['accuracy']}",flush=True)
       outputs:
         parameters:
@@ -96,14 +124,21 @@ spec:
       inputs:
         parameters:
           - name: node-id
+          - name: workflow-name
+          - name: retry-limit
           - name: model
+      retryStrategy:
+        limit: "{{inputs.parameters.retry-limit}}"
+        retryPolicy: Always
+        expression: asInt(lastRetry.exitCode) != 64
       container:
         image: pipeline-demo-backend:0.1.0
         command: [python, -c]
         args:
           - |
             import json
-            node="{{inputs.parameters.node-id}}"; model=json.loads(r'''{{inputs.parameters.model}}'''); report={"kind":"ReportRef","id":f"report-{node}","summary":f"Best model {model['id']} accuracy={model['accuracy']}"}
+            from app.node_control import ensure_node_running
+            node="{{inputs.parameters.node-id}}"; workflow="{{inputs.parameters.workflow-name}}"; ensure_node_running(workflow,node); model=json.loads(r'''{{inputs.parameters.model}}'''); report={"kind":"ReportRef","id":f"report-{node}","summary":f"Best model {model['id']} accuracy={model['accuracy']}"}
             open('/tmp/report.json','w').write(json.dumps(report)); print(f"[{node}] {report['summary']}",flush=True)
       outputs:
         parameters:

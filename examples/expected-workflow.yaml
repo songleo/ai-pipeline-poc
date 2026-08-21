@@ -24,6 +24,8 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: generate}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '0'}
                 - {name: sample-count, value: '1000'}
                 - {name: feature-count, value: '10'}
                 - {name: duration-seconds, value: '2'}
@@ -33,6 +35,8 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: preprocess}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '0'}
                 - {name: clean-ratio, value: '0.95'}
                 - {name: duration-seconds, value: '2'}
                 - {name: dataset, value: '{{tasks.generate.outputs.parameters.dataset}}'}
@@ -42,6 +46,8 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: train-a}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '2'}
                 - {name: algorithm, value: qwen-demo-a}
                 - {name: duration-seconds, value: '8'}
                 - {name: accuracy, value: '0.86'}
@@ -53,6 +59,8 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: train-b}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '2'}
                 - {name: algorithm, value: qwen-demo-b}
                 - {name: duration-seconds, value: '8'}
                 - {name: accuracy, value: '0.89'}
@@ -64,6 +72,8 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: compare}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '0'}
                 - {name: model-a, value: '{{tasks.train-a.outputs.parameters.model}}'}
                 - {name: model-b, value: '{{tasks.train-b.outputs.parameters.model}}'}
           - name: report
@@ -72,49 +82,54 @@ spec:
             arguments:
               parameters:
                 - {name: node-id, value: report}
+                - {name: workflow-name, value: '{{workflow.name}}'}
+                - {name: retry-limit, value: '0'}
                 - {name: model, value: '{{tasks.compare.outputs.parameters.bestModel}}'}
     - name: node-generate
       inputs:
-        parameters: [{name: node-id}, {name: sample-count}, {name: feature-count}, {name: duration-seconds}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: sample-count}, {name: feature-count}, {name: duration-seconds}]
       outputs:
         parameters: [{name: dataset, valueFrom: {parameter: '{{steps.execute.outputs.parameters.dataset}}'}}]
-      retryStrategy: {limit: '0', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: generate-data}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: sample-count, value: '{{inputs.parameters.sample-count}}'}
                 - {name: feature-count, value: '{{inputs.parameters.feature-count}}'}
                 - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
     - name: node-preprocess
       inputs:
-        parameters: [{name: node-id}, {name: clean-ratio}, {name: duration-seconds}, {name: dataset}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: clean-ratio}, {name: duration-seconds}, {name: dataset}]
       outputs:
         parameters: [{name: processedDataset, valueFrom: {parameter: '{{steps.execute.outputs.parameters.processedDataset}}'}}]
-      retryStrategy: {limit: '0', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: preprocess-data}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: clean-ratio, value: '{{inputs.parameters.clean-ratio}}'}
                 - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
                 - {name: dataset, value: '{{inputs.parameters.dataset}}'}
     - name: node-train-a
       inputs:
-        parameters: [{name: node-id}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
       outputs:
         parameters: [{name: model, valueFrom: {parameter: '{{steps.execute.outputs.parameters.model}}'}}]
-      retryStrategy: {limit: '2', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: mock-training}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: algorithm, value: '{{inputs.parameters.algorithm}}'}
                 - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
                 - {name: accuracy, value: '{{inputs.parameters.accuracy}}'}
@@ -122,16 +137,17 @@ spec:
                 - {name: dataset, value: '{{inputs.parameters.dataset}}'}
     - name: node-train-b
       inputs:
-        parameters: [{name: node-id}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: algorithm}, {name: duration-seconds}, {name: accuracy}, {name: fail-mode}, {name: dataset}]
       outputs:
         parameters: [{name: model, valueFrom: {parameter: '{{steps.execute.outputs.parameters.model}}'}}]
-      retryStrategy: {limit: '2', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: mock-training}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: algorithm, value: '{{inputs.parameters.algorithm}}'}
                 - {name: duration-seconds, value: '{{inputs.parameters.duration-seconds}}'}
                 - {name: accuracy, value: '{{inputs.parameters.accuracy}}'}
@@ -139,29 +155,31 @@ spec:
                 - {name: dataset, value: '{{inputs.parameters.dataset}}'}
     - name: node-compare
       inputs:
-        parameters: [{name: node-id}, {name: model-a}, {name: model-b}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: model-a}, {name: model-b}]
       outputs:
         parameters: [{name: bestModel, valueFrom: {parameter: '{{steps.execute.outputs.parameters.bestModel}}'}}]
-      retryStrategy: {limit: '0', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: compare-models}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: model-a, value: '{{inputs.parameters.model-a}}'}
                 - {name: model-b, value: '{{inputs.parameters.model-b}}'}
     - name: node-report
       inputs:
-        parameters: [{name: node-id}, {name: model}]
+        parameters: [{name: node-id}, {name: workflow-name}, {name: retry-limit}, {name: model}]
       outputs:
         parameters: [{name: report, valueFrom: {parameter: '{{steps.execute.outputs.parameters.report}}'}}]
-      retryStrategy: {limit: '0', retryPolicy: Always}
       steps:
         - - name: execute
             templateRef: {name: pipeline-demo-nodes, template: generate-report}
             arguments:
               parameters:
                 - {name: node-id, value: '{{inputs.parameters.node-id}}'}
+                - {name: workflow-name, value: '{{inputs.parameters.workflow-name}}'}
+                - {name: retry-limit, value: '{{inputs.parameters.retry-limit}}'}
                 - {name: model, value: '{{inputs.parameters.model}}'}
 

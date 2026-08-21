@@ -40,3 +40,42 @@ def test_node_status_output_and_retry_mapping() -> None:
     assert node["retryCount"] == 1
     assert node["podName"] == "pod-2"
     assert node["outputs"]["model"]["accuracy"] == 0.86
+    assert node["canStop"] is False
+    assert node["canRerun"] is True
+
+
+def test_requested_stop_maps_failed_node_to_cancelled() -> None:
+    workflow = {
+        "metadata": {
+            "name": "demo-stop",
+            "labels": {"demo.pipeline.io/pipeline": "demo"},
+            "annotations": {
+                "demo.pipeline.io/node-map": json.dumps({"train-a": "train-a"}),
+                "demo.pipeline.io/node-controls": json.dumps({"train-a": "STOP_REQUESTED"}),
+            },
+        },
+        "spec": {},
+        "status": {"phase": "Failed", "nodes": {"wrapper": {"displayName": "train-a", "phase": "Failed"}}},
+    }
+    node = workflow_detail(workflow)["nodes"][0]
+    assert node["status"] == "CANCELLED"
+    assert node["controlState"] == "STOP_REQUESTED"
+    assert node["canRerun"] is True
+
+
+def test_stop_request_that_loses_completion_race_is_not_shown_as_active() -> None:
+    workflow = {
+        "metadata": {
+            "name": "demo-finished",
+            "labels": {"demo.pipeline.io/pipeline": "demo"},
+            "annotations": {
+                "demo.pipeline.io/node-map": json.dumps({"train-a": "train-a"}),
+                "demo.pipeline.io/node-controls": json.dumps({"train-a": "STOP_REQUESTED"}),
+            },
+        },
+        "spec": {},
+        "status": {"phase": "Succeeded", "nodes": {"wrapper": {"displayName": "train-a", "phase": "Succeeded"}}},
+    }
+    node = workflow_detail(workflow)["nodes"][0]
+    assert node["status"] == "SUCCEEDED"
+    assert node["controlState"] is None

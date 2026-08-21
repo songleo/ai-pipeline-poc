@@ -20,5 +20,6 @@ export interface ValidationResult { valid: boolean; errors: ValidationIssue[]; w
 export interface RunNode {
   nodeId: string; taskName: string; status: UnifiedStatus; startedAt?: string; finishedAt?: string
   duration?: number; message?: string; retryCount: number; podName?: string; outputs: Record<string, unknown>
+  controlState?: 'STOP_REQUESTED'; canStop: boolean; canRerun: boolean
 }
 export interface RunDetail { workflowName: string; pipelineName: string; status: UnifiedStatus; startedAt?: string; finishedAt?: string; message?: string; nodes: RunNode[] }
