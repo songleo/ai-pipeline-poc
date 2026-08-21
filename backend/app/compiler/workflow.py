@@ -47,6 +47,7 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
     if not validation.valid:
         raise ValueError(validation.model_dump(mode="json"))
     run_id = run_id or uuid.uuid4().hex[:12]
+    definition_digest = hashlib.sha256(pipeline.model_dump_json().encode()).hexdigest()[:12]
     mapping = safe_task_names([node.id for node in pipeline.spec.nodes])
     nodes_by_id = {node.id: node for node in pipeline.spec.nodes}
     incoming: dict[str, list[Any]] = defaultdict(list)
@@ -138,6 +139,7 @@ def compile_pipeline(pipeline: Pipeline, run_id: str | None = None) -> dict[str,
                 "demo.pipeline.io/experiment": pipeline.metadata.experimentName,
                 "demo.pipeline.io/scenario": pipeline.metadata.scenario,
                 "demo.pipeline.io/tags": json.dumps(pipeline.metadata.tags, separators=(",", ":")),
+                "demo.pipeline.io/definition-digest": definition_digest,
             },
         },
         "spec": {

@@ -6,7 +6,7 @@ defineProps<{ data: PipelineNodeData; selected?: boolean }>()
 </script>
 
 <template>
-  <div class="pipeline-node" :class="[`status-${data.status.toLowerCase()}`, { selected }]">
+  <div class="pipeline-node" :class="[`status-${data.status.toLowerCase()}`, { selected, 'validation-error': data.validationError }]">
     <Handle v-for="(port, index) in data.definition.inputPorts" :id="port.name" :key="`in-${port.name}`" type="target" :position="Position.Left" :style="{ top: `${((index + 1) * 100) / (data.definition.inputPorts.length + 1)}%` }" :title="`${port.name}: ${port.type}`" />
     <div class="node-category">{{ data.definition.category }}</div>
     <strong>{{ data.pipelineNode.name || data.definition.displayName }}</strong>

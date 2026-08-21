@@ -24,6 +24,7 @@ def test_compiles_professional_workflow_metadata() -> None:
     assert workflow["spec"]["activeDeadlineSeconds"] == 420
     assert workflow["metadata"]["annotations"]["demo.pipeline.io/experiment"] == "小林的 AI 评论分类项目"
     assert json.loads(workflow["metadata"]["annotations"]["demo.pipeline.io/tags"]) == ["poc", "nlp", "comment-classification"]
+    assert len(workflow["metadata"]["annotations"]["demo.pipeline.io/definition-digest"]) == 12
 
 
 def test_parallel_training_evaluation_and_fan_in() -> None:

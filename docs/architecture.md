@@ -13,7 +13,7 @@ FastAPI ── Node Registry ── Validator ── Compiler
 Workflow CRD ── Argo Controller ── WorkflowTemplate ── Pods
 ```
 
-Node Registry 是节点类型、版本、参数 Schema、端口类型、模板名、默认重试和超时的唯一来源。浏览器从 `/api/node-types` 获取它，不复制业务定义。Validator 是最终权威；前端校验只用于即时反馈。Compiler 与路由分离，可以被单元测试和未来 Adapter 复用。`backend/app/adapters/contracts.py` 定义了最小 `start/get/cancel` 能力契约和显式 project/tenant/actor 上下文；当前 Argo 执行器尚未实现该平台契约。
+Node Registry 是节点类型、版本、参数 Schema、中文展示名、参数分组、PoC 模拟标识、端口类型、模板名、默认重试和超时的唯一来源。浏览器从 `/api/node-types` 获取它，不复制业务定义。Validator 是最终权威；前端校验用于即时反馈、问题列表和节点定位。Compiler 与路由分离，可以被单元测试和未来 Adapter 复用。`backend/app/adapters/contracts.py` 定义了最小 `start/get/cancel` 能力契约和显式 project/tenant/actor 上下文；当前 Argo 执行器尚未实现该平台契约。
 
 ## 安全边界
 
@@ -27,7 +27,7 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 2. 后端校验名称、节点、参数、端口、必填输入、重复边和 DAG。
 3. Compiler 把 node ID 规范化为安全且唯一的 Argo task 名。
 4. Edge 变成 task dependency 和 `{{tasks.<task>.outputs.parameters.<port>}}` 引用。
-5. 每个 task 只引用 `pipeline-demo-nodes` 中映射的 template，并附带运行/节点映射标签或注解。
+5. 每个 task 只引用 `pipeline-demo-nodes` 中映射的 template，并附带运行/节点映射标签、12 位 Pipeline 定义摘要或注解。
 6. Kubernetes API 在 `pipeline-demo` 创建 Workflow；Argo controller 创建 Pod。
 7. 后端把 Argo phase 映射为统一状态，解析节点/Pod/重试次数与 output parameters。
 

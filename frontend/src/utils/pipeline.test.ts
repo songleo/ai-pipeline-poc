@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NodeTypeDefinition, PortDefinition } from '../types/pipeline'
 import { examplePipeline } from './example'
-import { appendFlowNode, connectFlowNodes, flowToPipeline, pipelineToFlow, terminalStatuses, validateLocally } from './pipeline'
+import { appendFlowNode, autoLayoutFlow, clearFlow, connectFlowNodes, flowToPipeline, pipelineToFlow, removeFlowNode, terminalStatuses, validateLocally } from './pipeline'
 
 const port = (name: string, type: string): PortDefinition => ({ name, type, required: true, multiple: false })
 const definition = (type: string, inputs: PortDefinition[], outputs: PortDefinition[]): NodeTypeDefinition => ({
@@ -51,6 +51,23 @@ describe('Pipeline DSL tools', () => {
     expect(duplicate.error).toBe('该输入端口只能连接一次')
   })
 
+  it('deletes a node with all connected edges and clears the canvas', () => {
+    const flow = pipelineToFlow(examplePipeline, registry)
+    const removed = removeFlowNode(flow.nodes, flow.edges, 'train-baseline')
+    expect(removed.nodes.some(node => node.id === 'train-baseline')).toBe(false)
+    expect(removed.edges.some(edge => edge.source === 'train-baseline' || edge.target === 'train-baseline')).toBe(false)
+    expect(clearFlow()).toEqual({ nodes: [], edges: [] })
+  })
+
+  it('lays out a DAG from left to right without mutating node count', () => {
+    const flow = pipelineToFlow(examplePipeline, registry)
+    const arranged = autoLayoutFlow(flow.nodes, flow.edges)
+    const dataset = arranged.find(node => node.id === 'dataset')!
+    const deployment = arranged.find(node => node.id === 'deployment')!
+    expect(arranged).toHaveLength(flow.nodes.length)
+    expect(deployment.position.x).toBeGreaterThan(dataset.position.x)
+  })
+
   it('loads the professional sample and round trips its layout', () => {
     const flow = pipelineToFlow(examplePipeline, registry)
     expect(flow.nodes).toHaveLength(15); expect(flow.edges).toHaveLength(19)
@@ -63,6 +80,12 @@ describe('Pipeline DSL tools', () => {
     const value = structuredClone(examplePipeline)
     value.spec.edges[10] = { source: 'dataset', sourcePort: 'dataset', target: 'leaderboard', targetPort: 'evaluationA' }
     expect(validateLocally(value, registry).errors.map(item => item.code)).toContain('PORT_TYPE_MISMATCH')
+  })
+
+  it('reports missing required input with a target node id', () => {
+    const value = structuredClone(examplePipeline)
+    value.spec.edges = value.spec.edges.filter(edge => !(edge.target === 'profile' && edge.targetPort === 'dataset'))
+    expect(validateLocally(value, registry).errors).toContainEqual(expect.objectContaining({ code: 'MISSING_INPUT', nodeId: 'profile' }))
   })
 
   it('knows terminal unified statuses', () => {

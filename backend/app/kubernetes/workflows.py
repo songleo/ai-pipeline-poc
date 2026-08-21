@@ -101,6 +101,7 @@ def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
         "experimentName": metadata.get("annotations", {}).get("demo.pipeline.io/experiment"),
         "scenario": metadata.get("annotations", {}).get("demo.pipeline.io/scenario"),
         "tags": json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/tags", "[]")),
+        "definitionDigest": metadata.get("annotations", {}).get("demo.pipeline.io/definition-digest"),
         "status": workflow_status,
         "startedAt": status.get("startedAt"), "finishedAt": status.get("finishedAt"),
         "message": status.get("message"), "nodes": result_nodes,

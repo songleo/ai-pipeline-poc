@@ -12,6 +12,7 @@ python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DI
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 value["metadata"]["name"]="node-control-smoke"
+value["metadata"]["tags"].append("system-test")
 value["spec"]["runPolicy"]["timeoutSeconds"]=600
 for node in value["spec"]["nodes"]:
     if node["id"] in {"train-baseline","train-candidate"}:

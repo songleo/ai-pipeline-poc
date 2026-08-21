@@ -2,6 +2,8 @@ from pathlib import Path
 
 import yaml
 
+from app.registry import NODE_TYPES
+
 
 ROOT = Path(__file__).parents[2]
 
@@ -26,3 +28,11 @@ def test_workflow_template_is_fixed_whitelist() -> None:
     for template in document["spec"]["templates"]:
         assert template["container"]["image"] == "pipeline-demo-backend:0.1.0"
         assert template["container"]["command"] == ["python", "-m", "app.workflow_nodes"]
+
+
+def test_registry_exposes_professional_parameter_presentation() -> None:
+    fields = NODE_TYPES["train-model"]["uiSchema"]["fields"]
+    assert fields["algorithm"]["label"] == "算法 / 基础模型"
+    assert fields["resourceProfile"]["group"] == "资源配置"
+    assert fields["baseAccuracy"]["simulation"] is True
+    assert "正式接入后" in fields["baseAccuracy"]["help"]

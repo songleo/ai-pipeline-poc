@@ -253,3 +253,43 @@ frontend production build: passed
 - `pipeline-demo-backend` 与 `pipeline-demo-frontend` 均为 `1/1 Available`；`/api/health` 返回 `status=ok`，前端返回 HTTP 200。
 
 Chrome 自动交互回归本轮未完成，不能记为通过。诊断确认 Chrome 已安装，但当前 Windows 用户下浏览器扩展数据目录不存在，且 `HKCU` 下 Native Messaging Host 注册项与清单文件缺失，因此可信控制通道不可用。需从 Codex/ChatGPT 插件界面重新安装 Browser 插件并确认 Chrome 扩展启用后，再补做拖拽、连线、模板运行和版本保存的 Chrome 实际交互回归。
+
+## 2026-08-21 算法工程师体验改进
+
+本轮按评审批准范围补齐通用编辑器与实验查看体验，没有增加真实训练或 `ai-platform` 调用：
+
+- 编辑模式新增删除节点、关联连线清理、清空画布、撤销/重做、未保存提示、自动布局、适应画布、全屏和左右面板折叠；运行视图仍禁止结构修改。
+- Node Registry 的 `uiSchema` 新增中文参数名、分组、单位、帮助信息和 `simulation` 标记。训练配置、资源、运行策略与 PoC 模拟参数分开展示；模拟 Accuracy/F1 明确不代表真实可配置结果。
+- 校验结果改为问题列表，可点击定位并高亮节点；前后端用户可见校验消息统一为中文。
+- 运行记录默认按最新时间排序，支持搜索、状态以及业务运行/系统验证筛选。回归脚本为新运行增加 `system-test` 标签。
+- Compiler 为每次运行记录 12 位 Pipeline 定义摘要；运行详情增加完整 Accuracy/F1/延迟排行榜、候选相对基线差值和准入检查。
+
+静态验证：
+
+```text
+frontend Vitest: 3 files, 13 tests passed
+frontend vue-tsc: passed
+frontend production build: passed, 1594 modules transformed
+backend pytest: 31 passed
+bash -n scripts/*.sh: passed
+git diff --check: passed（仅 CRLF 转换提示）
+```
+
+新增前端单元回归覆盖：删除一个节点后所有入边/出边同步移除、整画布清空、左到右自动布局、必填输入缺失定位、运行记录最新优先、系统验证隔离和中文状态。Registry 单元回归确认训练参数中文标签、资源分组与模拟结果标识。
+
+Kind 部署与真实执行：
+
+- 后端镜像 `sha256:630bda5e2e7225a19a3c3963ebcdb026e54a6ca29824401dd3822d2a64a54ca4`、最终前端镜像 `sha256:cd5be93fe5662b03466c8a6cace66a78e83e70fe13aed8752420491b13a23fad` 已加载到 `pipeline-demo-control-plane`，两个 Deployment 滚动更新成功。
+- `scripts/smoke-test.sh` 退出码 0：主链 `comment-classification-demo-z5qn4` 为 `SUCCEEDED`，定义摘要 `0706fb5b3c47`；拒绝分支 `training-qualification-rejected-xssbc` 为 `SUCCEEDED`；固定失败 `comment-classification-demo-h5dwv` 为 `FAILED`；手动停止 `comment-classification-demo-fvsvp` 为 `CANCELLED`。
+- `scripts/node-control-smoke.sh` 退出码 0，Workflow `node-control-smoke-88rtj` 验证基线训练独立停止且不自动重试、候选训练继续、选定分支及下游重跑成功。
+
+内置浏览器实际交互回归：
+
+- 模板编辑页可见删除节点、清空画布、撤销/重做、自动布局、适应画布、全屏和面板折叠入口；未选择节点时删除禁用，空画布时清空与布局禁用。
+- 点击自动布局后“撤销”可用并显示未保存提示；执行撤销后“重做”可用。
+- 训练节点参数按中文分组显示，模拟执行时间、失败模式、Accuracy、F1 和延迟均标记“仅 PoC 模拟”，并展示正式接入边界说明。
+- 空画布点击校验显示 `EMPTY_PIPELINE` 中文问题列表；清空按钮处于禁用状态。
+- 系统验证筛选显示最新运行，`comment-classification-demo-z5qn4` 行包含成功状态与定义摘要 `0706fb5b3c47`。
+- 成功运行详情显示 Accuracy/F1/延迟、三项准入检查、`Accuracy +0.0350 / F1 +0.0375` 候选增益和部署交接 READY。
+
+浏览器回归没有代用户确认执行删除/清空动作，因此不能把确认后的页面删除动画记为浏览器通过；删除、关联连线清理和清空的数据行为由 13 项前端单元测试覆盖。当前实际页面地址 `http://localhost:5173`。

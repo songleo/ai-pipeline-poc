@@ -36,7 +36,13 @@ curl -fsS "$API_URL/api/health" | grep -q 'ok'
 curl -fsS "$API_URL/api/node-types" | grep -q 'model-admission-gate'
 curl -fsS -H 'Content-Type: application/json' --data-binary "@$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$API_URL/api/pipelines/validate" | grep -q '"valid":true'
 
-workflow="$(submit_pipeline "$PROJECT_ROOT/examples/training-qualification-pipeline.json")"
+python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/approved.json" <<'PY'
+import json,sys
+value=json.load(open(sys.argv[1],encoding="utf-8"))
+value["metadata"]["tags"].append("system-test")
+json.dump(value,open(sys.argv[2],"w",encoding="utf-8"))
+PY
+workflow="$(submit_pipeline "$TMP_DIR/approved.json")"
 echo "Submitted $workflow"
 
 run="$(wait_for_status "$workflow" SUCCEEDED 360)"
@@ -62,6 +68,7 @@ python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DI
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
 value["metadata"]["name"]="training-qualification-rejected"
+value["metadata"]["tags"].append("system-test")
 for node in value["spec"]["nodes"]:
     if node["id"] == "admission":
         node["parameters"]["minAccuracy"]=0.99
@@ -85,6 +92,7 @@ curl -fsS "$API_URL/api/runs/$rejected_workflow/nodes/admission/output" | grep -
 python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/failing.json" <<'PY'
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
+value["metadata"]["tags"].append("system-test")
 for node in value["spec"]["nodes"]:
     if node["id"] == "train-baseline":
         node["parameters"].update(failMode="always", retryLimit=2, durationSeconds=1)
@@ -104,6 +112,7 @@ curl -fsS "$API_URL/api/runs/$failed_workflow/nodes/train-baseline/logs" | grep 
 python3 - "$PROJECT_ROOT/examples/training-qualification-pipeline.json" "$TMP_DIR/stoppable.json" <<'PY'
 import json,sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
+value["metadata"]["tags"].append("system-test")
 for node in value["spec"]["nodes"]:
     if "durationSeconds" in node["parameters"]:
         node["parameters"]["durationSeconds"]=60

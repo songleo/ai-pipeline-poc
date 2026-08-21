@@ -58,14 +58,14 @@ npm run dev
 
 ## 演示与测试
 
-在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，然后点击“校验”和“运行”。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
+在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，然后点击“校验”和“运行”。编辑器支持节点删除、关联连线清理、整画布清空、撤销/重做、自动布局、全屏和左右面板折叠；校验问题可以定位到节点。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
 
 ```bash
 make test
 make smoke
 ```
 
-`make smoke` 检查健康、Registry、校验、提交、通过/拒绝两种门禁路径、排行榜、节点状态、日志、输出和两训练节点时间区间重叠。实际执行证据见 [验证报告](docs/validation-report.md)。
+`make smoke` 检查健康、Registry、校验、提交、通过/拒绝两种门禁路径、排行榜、节点状态、日志、输出和两训练节点时间区间重叠。运行记录默认区分业务运行与带 `system-test` 标签的系统验证，并记录 Pipeline 定义摘要用于核对运行定义。实际执行证据见 [验证报告](docs/validation-report.md)。
 
 ## 停止和清理
 

@@ -2,6 +2,37 @@ from copy import deepcopy
 from typing import Any
 
 
+PARAMETER_UI: dict[str, dict[str, Any]] = {
+    "datasetName": {"label": "数据集名称", "group": "基础信息"},
+    "version": {"label": "数据版本", "group": "基础信息", "help": "选择不可变的数据集版本。"},
+    "sampleCount": {"label": "模拟样本数", "group": "PoC 模拟参数", "unit": "条", "simulation": True},
+    "missingRate": {"label": "模拟缺失率", "group": "PoC 模拟参数", "simulation": True},
+    "classBalance": {"label": "模拟类别占比", "group": "PoC 模拟参数", "simulation": True},
+    "durationSeconds": {"label": "模拟执行时长", "group": "PoC 模拟参数", "unit": "秒", "simulation": True},
+    "strategy": {"label": "处理策略", "group": "处理配置"},
+    "minSamples": {"label": "最小样本数", "group": "门禁规则", "unit": "条"},
+    "maxMissingRate": {"label": "最大缺失率", "group": "门禁规则"},
+    "algorithm": {"label": "算法 / 基础模型", "group": "训练配置"},
+    "epochs": {"label": "训练轮次", "group": "训练配置", "unit": "轮"},
+    "learningRate": {"label": "学习率", "group": "训练配置"},
+    "resourceProfile": {"label": "资源规格", "group": "资源配置"},
+    "baseAccuracy": {"label": "模拟 Accuracy", "group": "PoC 模拟结果", "simulation": True, "help": "仅用于生成模拟评测输出，正式接入后不可人工设置。"},
+    "baseF1": {"label": "模拟 F1", "group": "PoC 模拟结果", "simulation": True, "help": "仅用于生成模拟评测输出，正式接入后不可人工设置。"},
+    "latencyMs": {"label": "模拟推理延迟", "group": "PoC 模拟结果", "unit": "毫秒", "simulation": True},
+    "retryLimit": {"label": "失败重试次数", "group": "运行策略", "unit": "次"},
+    "failMode": {"label": "模拟失败模式", "group": "PoC 模拟参数", "simulation": True},
+    "accuracyAdjustment": {"label": "模拟精度修正", "group": "PoC 模拟结果", "simulation": True},
+    "minAccuracy": {"label": "最低 Accuracy", "group": "门禁规则"},
+    "minF1": {"label": "最低 F1", "group": "门禁规则"},
+    "maxLatencyMs": {"label": "最大推理延迟", "group": "门禁规则", "unit": "毫秒"},
+    "versionAlias": {"label": "模型版本别名", "group": "登记配置"},
+    "inputSample": {"label": "冒烟输入样本", "group": "冒烟配置"},
+    "expectedOutput": {"label": "预期输出", "group": "冒烟配置"},
+    "environment": {"label": "目标环境", "group": "部署交接"},
+    "replicas": {"label": "实例数", "group": "部署交接", "unit": "个"},
+}
+
+
 def port(name: str, data_type: str) -> dict[str, Any]:
     return {"name": name, "type": data_type, "required": True, "multiple": False}
 
@@ -37,7 +68,8 @@ def node(
         "type": node_type, "version": "1.0.0", "displayName": display_name,
         "description": description, "category": category,
         "parametersSchema": schema(list(properties), properties) if properties else {"type": "object", "properties": {}, "additionalProperties": False},
-        "uiSchema": {"order": list(properties)}, "inputPorts": inputs, "outputPorts": outputs,
+        "uiSchema": {"order": list(properties), "fields": {name: deepcopy(PARAMETER_UI.get(name, {"label": name, "group": "其他"})) for name in properties}},
+        "inputPorts": inputs, "outputPorts": outputs,
         "workflowTemplateName": "pipeline-demo-nodes", "templateName": template,
         "defaultRetryLimit": retry, "defaultTimeoutSeconds": 180 if category == "训练" else 120,
         "parameterMapping": parameter_mapping, "inputMapping": input_mapping or {},
