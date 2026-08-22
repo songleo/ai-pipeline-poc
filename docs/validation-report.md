@@ -361,3 +361,33 @@ Chrome 实际端到端回归：
 - 运行记录将上述运行显示为最新业务运行；点击详情后恢复 4 节点 DAG、v1、同一摘要和相同评测结果。
 
 已知构建提示：前端产物主 chunk 约 1.23 MB，Vite 给出大 chunk 警告，不影响本轮 PoC 验证；前端 Dockerfile 在源码变化后重新执行 npm 依赖层，本次网络安装约 5 分钟，后续可单独优化缓存顺序。
+
+## 2026-08-23 节点连接引导
+
+本轮为新手编排增加基于 Registry 端口契约的连接引导，没有引入业务场景专用规则，也没有接入 `ai-platform`。拖入或选中节点后，组件库会高亮可作为上游或下游的组件，详情面板会显示缺失必填输入、推荐方向、Artifact 类型以及添加后仍缺少的输入。画布中已有的兼容节点优先于新建节点推荐；只有端口组合唯一时才允许“添加并连接”或“直接连接”，多端口歧义明确提示“需要选择端口”，不会替用户决定分支。
+
+前端连线校验同时补齐类型不匹配、自连接、重复边、单输入占用和成环检查；开始拖拽连线时，目标端口会按兼容性高亮并显示原因。连接建议保持通用：排序依据是基础/高级级别、画布已有节点和图距离，不绑定具体算法业务。
+
+静态验证：
+
+```text
+frontend Vitest: 4 files, 23 tests passed
+frontend vue-tsc: passed
+frontend production build: passed, 1595 modules transformed
+backend pytest: 34 passed
+bash -n scripts/*.sh: passed
+git diff --check: passed（仅 README.md CRLF 转换提示）
+```
+
+单元回归覆盖下游推荐、缺失输入补充、多端口歧义不自动连接、画布已有节点优先、图距离排序，以及重复边、单输入占用、自连接和成环拒绝。前端构建仍存在约 1.23 MB 主 chunk 的既有 Vite 警告，不影响本轮 PoC。
+
+Kind 部署与 Chrome 端到端回归：
+
+- 当前 Context 明确为 `kind-pipeline-demo`；最终前端镜像 `sha256:0c2801538fa6f5534adeccd9d42571b5bdaf8b30de23184e3d1054d1cd60f5d2` 已加载并完成滚动更新。前后端 Deployment 均为 `1/1 Available`，`/api/health` 返回 `status=ok`，前端返回 HTTP 200。
+- Chrome 新建 `pipeline-29487`，实际拖入“选择数据集版本”。组件库正确高亮可连接的预处理、训练和评测组件，详情面板显示推荐端口及评测节点仍需要的模型输入。
+- 依次使用“添加并连接”生成预处理、训练和评测节点；评测节点随后明确提示缺少 `dataset · DatasetRef`，优先推荐画布里的“特征预处理”，点击“直接连接”后缺失提示消失。
+- DSL 精确包含 4 个节点和 4 条边：数据集到预处理、预处理到训练、训练模型到评测，以及预处理数据到评测。排行榜组件因存在两个同类型输入端口而显示禁用的“需要选择端口”，未发生错误自动连线。
+- Chrome 回归期间发现：只更新本地 Vue `edges` 引用时，提示成功但 Vue Flow 内部 Store 没有保留新边。最终改为先注册节点，再调用 Vue Flow `addEdges()`；重新部署后 DSL 与画布均保留连线，避免假成功。
+- 校验通过并保存不可变版本 v1，提交 Workflow `pipeline-29487-pj59p`，定义摘要 `13a1003b1126`；实际运行最终为 `Succeeded`，4/4 节点完成且均为 `SUCCEEDED`。
+
+当前可访问地址为 `http://localhost:5173`。

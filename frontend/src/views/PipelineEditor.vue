@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { type Connection, type Edge, type Node, type NodeTypesObject, useVueFlow, VueFlow } from '@vue-flow/core'
+import { type Connection, type Edge, type Node, type NodeTypesObject, type OnConnectStartParams, useVueFlow, VueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -14,7 +14,8 @@ import PipelineNode from '../components/nodes/PipelineNode.vue'
 import type { NodeTypeDefinition, Pipeline, PipelineCatalogEntry, RunDetail, UnifiedStatus, ValidationIssue, ValidationResult } from '../types/pipeline'
 import { beginnerPipeline, examplePipeline } from '../utils/example'
 import { clonePipeline, copyCatalogEntry, deletePipeline, loadLocalCatalog, saveToCatalog, templateEntry } from '../utils/pipelineCatalog'
-import { appendFlowNode, autoLayoutFlow, clearFlow, connectFlowNodes, flowToPipeline, pipelineToFlow, removeFlowNode, terminalStatuses, validateLocally, type PipelineNodeData } from '../utils/pipeline'
+import { connectionHintKey, connectionRecommendations, missingRequiredInputs, paletteCompatibility, type ActiveConnectionHint, type ConnectionRecommendation } from '../utils/connectionGuide'
+import { appendFlowNode, autoLayoutFlow, clearFlow, connectionError, connectFlowNodes, flowToPipeline, pipelineToFlow, removeFlowNode, terminalStatuses, validateLocally, type PipelineNodeData } from '../utils/pipeline'
 
 type Page = 'catalog' | 'workspace' | 'history'
 type WorkspaceMode = 'edit' | 'run'
@@ -49,12 +50,14 @@ const validationOpen = ref(false)
 const validationResult = ref<ValidationResult>()
 const undoStack = shallowRef<EditorSnapshot[]>([])
 const redoStack = shallowRef<EditorSnapshot[]>([])
+const connectionHint = ref<ActiveConnectionHint>()
 const savedSignature = ref('')
 let lastSnapshot: EditorSnapshot | undefined
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const nodeTypes = { pipeline: markRaw(PipelineNode) } as unknown as NodeTypesObject
-const { fitView, screenToFlowCoordinate } = useVueFlow()
+const { addEdges, fitView, screenToFlowCoordinate } = useVueFlow()
+provide(connectionHintKey, connectionHint)
 const catalogEntries = computed(() => [
   templateEntry(beginnerPipeline, {
     id: 'template-beginner-training', name: '新手入门：基础模型训练 Pipeline', recommended: true,
@@ -69,6 +72,9 @@ const catalogEntries = computed(() => [
   ...localEntries.value,
 ])
 const selectedNode = computed(() => flowNodes.value.find(item => item.id === selectedId.value))
+const selectedRecommendations = computed(() => connectionRecommendations(selectedNode.value, flowNodes.value, flowEdges.value, registry.value))
+const selectedMissingInputs = computed(() => selectedNode.value ? missingRequiredInputs(selectedNode.value, flowEdges.value) : [])
+const paletteGuide = computed(() => paletteCompatibility(selectedRecommendations.value))
 const selectedRuntime = computed(() => runDetail.value?.nodes.find(item => item.nodeId === selectedId.value))
 const currentStatus = computed(() => runDetail.value?.status ?? 'IDLE')
 const canStop = computed(() => !!workflowName.value && !terminalStatuses.has(currentStatus.value as UnifiedStatus))
@@ -189,6 +195,7 @@ function onDrop(event: DragEvent) {
   if (!definition) return
   const position = screenToFlowCoordinate({ x: event.clientX, y: event.clientY }); const id = `${type}-${Math.random().toString(36).slice(2, 7)}`
   flowNodes.value = appendFlowNode(flowNodes.value, definition, position, id)
+  selectedId.value = id; inspectorCollapsed.value = false
   recordHistory()
 }
 function onConnect(connection: Connection) {
@@ -197,6 +204,38 @@ function onConnect(connection: Connection) {
   if (result.error) { ElMessage.error(result.error); return }
   flowEdges.value = result.edges
   recordHistory()
+}
+function isValidConnection(connection: Connection) { return !connectionError(flowNodes.value, flowEdges.value, connection) }
+function onConnectStart(params: OnConnectStartParams) {
+  if (!params.nodeId || !params.handleId || !params.handleType) return
+  const definition = flowNodes.value.find(node => node.id === params.nodeId)?.data?.definition
+  const port = params.handleType === 'source'
+    ? definition?.outputPorts.find(item => item.name === params.handleId)
+    : definition?.inputPorts.find(item => item.name === params.handleId)
+  connectionHint.value = port ? { artifactType: port.type, handleType: params.handleType } : undefined
+}
+function onConnectEnd() { connectionHint.value = undefined }
+async function addRecommended(recommendation: ConnectionRecommendation) {
+  const selected = selectedNode.value
+  if (!selected || !recommendation.autoConnect) return
+  const id = recommendation.existingNodeId ?? `${recommendation.definition.type}-${Math.random().toString(36).slice(2, 7)}`
+  const direction = recommendation.direction === 'downstream' ? 1 : -1
+  const position = { x: Math.max(20, selected.position.x + direction * 270), y: selected.position.y + 110 }
+  const nodes = recommendation.existingNodeId ? flowNodes.value : appendFlowNode(flowNodes.value, recommendation.definition, position, id)
+  if (!recommendation.existingNodeId) { flowNodes.value = nodes; await nextTick() }
+  const connection: Connection = recommendation.direction === 'downstream'
+    ? { source: selected.id, sourceHandle: recommendation.sourcePort, target: id, targetHandle: recommendation.targetPort }
+    : { source: id, sourceHandle: recommendation.sourcePort, target: selected.id, targetHandle: recommendation.targetPort }
+  const result = connectFlowNodes(nodes, flowEdges.value, connection)
+  if (result.error) {
+    if (!recommendation.existingNodeId) flowNodes.value = flowNodes.value.filter(node => node.id !== id)
+    ElMessage.error(result.error); return
+  }
+  addEdges(result.edges.at(-1)!)
+  await nextTick()
+  selectedId.value = recommendation.existingNodeId ? selected.id : id; recordHistory()
+  ElMessage.success(recommendation.existingNodeId ? `已连接画布节点“${recommendation.displayName}”` : `已添加“${recommendation.definition.displayName}”并连接 ${recommendation.artifactType}`)
+  await nextTick(); fitView({ nodes: [selected.id, id], padding: 0.45, duration: 350 })
 }
 function refreshSelectedNode() { flowNodes.value = [...flowNodes.value]; recordHistory() }
 function onNodeDragStop() { recordHistory() }
@@ -313,13 +352,14 @@ onBeforeUnmount(stopPolling)
       </div>
 
       <main class="workspace">
-        <NodePalette v-if="workspaceMode === 'edit' && !paletteCollapsed" :node-types="registry" />
+        <NodePalette v-if="workspaceMode === 'edit' && !paletteCollapsed" :node-types="registry" :compatibility="paletteGuide" :guidance-active="!!selectedNode" />
         <div class="flow-wrap" @dragover="onDragOver" @drop="onDrop">
-          <VueFlow v-model:nodes="flowNodes" v-model:edges="flowEdges" :node-types="nodeTypes" fit-view-on-init :delete-key-code="null" :nodes-draggable="workspaceMode === 'edit'" :nodes-connectable="workspaceMode === 'edit'" :elements-selectable="true" @connect="onConnect" @node-click="selectNode" @node-drag-stop="onNodeDragStop" @pane-click="selectedId = undefined">
+          <div v-if="connectionHint" class="connection-hint">正在连接 {{ connectionHint.artifactType }}：绿色端口可连接，灰色端口类型不匹配</div>
+          <VueFlow v-model:nodes="flowNodes" v-model:edges="flowEdges" :node-types="nodeTypes" fit-view-on-init :delete-key-code="null" :nodes-draggable="workspaceMode === 'edit'" :nodes-connectable="workspaceMode === 'edit'" :elements-selectable="true" :is-valid-connection="isValidConnection" @connect="onConnect" @connect-start="onConnectStart" @connect-end="onConnectEnd" @node-click="selectNode" @node-drag-stop="onNodeDragStop" @pane-click="selectedId = undefined">
             <Background pattern-color="#cbd5e1" :gap="20" /><MiniMap :node-color="minimapColor" pannable zoomable /><Controls />
           </VueFlow>
         </div>
-        <NodeInspector v-if="selectedNode && !inspectorCollapsed" :data="selectedNode.data" :runtime="selectedRuntime" :logs="logs" :output="output" :control-busy="controlBusy" :readonly="workspaceMode === 'run'" @changed="refreshSelectedNode" @delete-node="deleteSelectedNode" @stop-node="stopSelectedNode" @rerun-node="rerunSelectedNode" />
+        <NodeInspector v-if="selectedNode && !inspectorCollapsed" :data="selectedNode.data" :runtime="selectedRuntime" :logs="logs" :output="output" :control-busy="controlBusy" :readonly="workspaceMode === 'run'" :recommendations="selectedRecommendations" :missing-inputs="selectedMissingInputs" @changed="refreshSelectedNode" @delete-node="deleteSelectedNode" @stop-node="stopSelectedNode" @rerun-node="rerunSelectedNode" @add-recommended="addRecommended" />
         <aside v-else-if="!inspectorCollapsed" class="inspector pipeline-inspector">
           <span class="eyebrow">{{ workspaceMode === 'run' ? 'RUN OVERVIEW' : 'PIPELINE' }}</span><h3>{{ workspaceMode === 'run' ? '运行概览' : '编排说明' }}</h3>
           <template v-if="workspaceMode === 'edit'"><p>从左侧拖入节点，通过类型化端口连线。连线标签展示 Artifact 类型或条件分支语义。</p><div class="boundary-card"><strong>可复用边界</strong><span>DSL · Registry · Validator · Adapter Contract</span><small>执行器与产品交互保持解耦</small></div></template>

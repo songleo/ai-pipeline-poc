@@ -53,7 +53,21 @@ describe('Pipeline DSL tools', () => {
     expect(incompatible.error).toBe('端口类型不兼容')
     const first = connectFlowNodes(flow.nodes, [], { source: 'dataset', sourceHandle: 'dataset', target: 'profile', targetHandle: 'dataset' })
     const duplicate = connectFlowNodes(flow.nodes, first.edges, { source: 'dataset', sourceHandle: 'dataset', target: 'profile', targetHandle: 'dataset' })
-    expect(duplicate.error).toBe('该输入端口只能连接一次')
+    expect(duplicate.error).toBe('该连线已经存在')
+    const occupied = connectFlowNodes(flow.nodes, first.edges, { source: 'preprocess', sourceHandle: 'processedDataset', target: 'profile', targetHandle: 'dataset' })
+    expect(occupied.error).toBe('该输入端口只能连接一次')
+  })
+
+  it('rejects self connections and cycles before they reach backend validation', () => {
+    const preprocessDefinition = registry.find(item => item.type === 'feature-preprocess')!
+    let nodes: ReturnType<typeof pipelineToFlow>['nodes'] = []
+    nodes = appendFlowNode(nodes, preprocessDefinition, { x: 100, y: 100 }, 'preprocess-a')
+    nodes = appendFlowNode(nodes, preprocessDefinition, { x: 360, y: 100 }, 'preprocess-b')
+    const self = connectFlowNodes(nodes, [], { source: 'preprocess-a', sourceHandle: 'processedDataset', target: 'preprocess-a', targetHandle: 'dataset' })
+    expect(self.error).toBe('节点不能连接到自身')
+    const first = connectFlowNodes(nodes, [], { source: 'preprocess-a', sourceHandle: 'processedDataset', target: 'preprocess-b', targetHandle: 'dataset' })
+    const cycle = connectFlowNodes(nodes, first.edges, { source: 'preprocess-b', sourceHandle: 'processedDataset', target: 'preprocess-a', targetHandle: 'dataset' })
+    expect(cycle.error).toBe('该连线会形成环路')
   })
 
   it('deletes a node with all connected edges and clears the canvas', () => {

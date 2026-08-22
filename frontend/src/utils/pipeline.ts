@@ -5,6 +5,30 @@ export interface PipelineNodeData { definition: NodeTypeDefinition; pipelineNode
 export interface ConnectFlowResult { edges: Edge[]; error?: string }
 export interface FlowMutationResult { nodes: Node<PipelineNodeData>[]; edges: Edge[] }
 
+export function connectionError(nodes: Node<PipelineNodeData>[], edges: Edge[], connection: Connection): string | undefined {
+  const source = nodes.find(item => item.id === connection.source)
+  const target = nodes.find(item => item.id === connection.target)
+  const output = source?.data?.definition.outputPorts.find(item => item.name === connection.sourceHandle)
+  const input = target?.data?.definition.inputPorts.find(item => item.name === connection.targetHandle)
+  if (!source || !target || !output || !input || output.type !== input.type) return '端口类型不兼容'
+  if (source.id === target.id) return '节点不能连接到自身'
+  if (edges.some(edge => edge.source === source.id && edge.sourceHandle === connection.sourceHandle && edge.target === target.id && edge.targetHandle === connection.targetHandle)) return '该连线已经存在'
+  if (!input.multiple && edges.some(edge => edge.target === target.id && edge.targetHandle === connection.targetHandle)) return '该输入端口只能连接一次'
+
+  const children = new Map(nodes.map(node => [node.id, [] as string[]]))
+  for (const edge of edges) children.get(edge.source)?.push(edge.target)
+  const stack = [target.id]
+  const visited = new Set<string>()
+  while (stack.length) {
+    const nodeId = stack.pop()!
+    if (nodeId === source.id) return '该连线会形成环路'
+    if (visited.has(nodeId)) continue
+    visited.add(nodeId)
+    stack.push(...(children.get(nodeId) ?? []))
+  }
+  return undefined
+}
+
 export function defaultParameters(definition: NodeTypeDefinition): Record<string, unknown> {
   return Object.fromEntries(Object.entries(definition.parametersSchema.properties).flatMap(([key, value]) => value.default === undefined ? [] : [[key, value.default]]))
 }
@@ -38,14 +62,10 @@ export function connectFlowNodes(
   edges: Edge[],
   connection: Connection,
 ): ConnectFlowResult {
-  const source = nodes.find(item => item.id === connection.source)
-  const target = nodes.find(item => item.id === connection.target)
-  const output = source?.data?.definition.outputPorts.find(item => item.name === connection.sourceHandle)
-  const input = target?.data?.definition.inputPorts.find(item => item.name === connection.targetHandle)
-  if (!output || !input || output.type !== input.type) return { edges, error: '端口类型不兼容' }
-  if (!input.multiple && edges.some(edge => edge.target === connection.target && edge.targetHandle === connection.targetHandle)) {
-    return { edges, error: '该输入端口只能连接一次' }
-  }
+  const error = connectionError(nodes, edges, connection)
+  if (error) return { edges, error }
+  const source = nodes.find(item => item.id === connection.source)!
+  const output = source.data!.definition.outputPorts.find(item => item.name === connection.sourceHandle)!
   const condition = source?.data?.definition.branchConditions?.[connection.sourceHandle ?? '']
   const semanticLabel = condition ? `${connection.sourceHandle} · ${condition.value === 'APPROVED' ? '通过' : '拒绝'}` : `${output.name} · ${output.type}`
   return { edges: addEdge({ ...connection, label: semanticLabel, labelBgPadding: [7, 4], labelBgBorderRadius: 4 }, [...edges]) as Edge[] }

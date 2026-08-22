@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { ParameterProperty, ParameterUi, RunNode } from '../../types/pipeline'
+import type { ConnectionRecommendation } from '../../utils/connectionGuide'
 import type { PipelineNodeData } from '../../utils/pipeline'
 
-const props = defineProps<{ data?: PipelineNodeData; runtime?: RunNode; logs: string; output: Record<string, unknown>; controlBusy: boolean; readonly: boolean }>()
-const emit = defineEmits<{ changed: []; stopNode: []; rerunNode: []; deleteNode: [] }>()
+const props = defineProps<{ data?: PipelineNodeData; runtime?: RunNode; logs: string; output: Record<string, unknown>; controlBusy: boolean; readonly: boolean; recommendations?: ConnectionRecommendation[]; missingInputs?: Array<{ name: string; type: string }> }>()
+const emit = defineEmits<{ changed: []; stopNode: []; rerunNode: []; deleteNode: []; addRecommended: [recommendation: ConnectionRecommendation] }>()
 const active = ref('properties')
 watch(() => props.data?.pipelineNode.id, () => { active.value = 'properties' })
 const title = computed(() => props.data?.pipelineNode.name || props.data?.definition.displayName || 'Pipeline')
@@ -30,6 +31,17 @@ const groups = computed(() => {
   <aside class="inspector">
     <template v-if="data">
       <div class="inspector-heading"><span class="eyebrow">{{ data.definition.category }}</span><h3>{{ title }}</h3><p>{{ data.definition.description }}</p></div>
+      <section v-if="!readonly" class="connection-guide">
+        <div class="connection-guide-title"><strong>连接建议</strong><span>按端口类型生成</span></div>
+        <div v-if="missingInputs?.length" class="missing-inputs"><span>还缺少</span><el-tag v-for="port in missingInputs" :key="port.name" size="small" type="warning">{{ port.name }} · {{ port.type }}</el-tag></div>
+        <div v-for="item in recommendations?.slice(0, 4)" :key="item.id" class="recommendation-card">
+          <div><el-tag size="small" :type="item.direction === 'downstream' ? 'success' : 'info'">{{ item.direction === 'downstream' ? '推荐下游' : '补充上游' }}</el-tag><el-tag v-if="item.existingNodeId" size="small" type="warning">画布节点</el-tag><strong>{{ item.displayName || item.definition.displayName }}</strong></div>
+          <small>{{ item.sourcePort }} → {{ item.targetPort }} · {{ item.artifactType }}</small>
+          <p v-if="item.missingAfterConnect.length">添加后仍需：{{ item.missingAfterConnect.map(port => `${port.name} · ${port.type}`).join('、') }}</p>
+          <el-button size="small" type="primary" plain :disabled="!item.autoConnect" @click="emit('addRecommended', item)">{{ item.autoConnect ? (item.existingNodeId ? '直接连接' : '添加并连接') : '需要选择端口' }}</el-button>
+        </div>
+        <el-empty v-if="!recommendations?.length" description="暂无可推荐连接" :image-size="44" />
+      </section>
       <el-tabs v-model="active" stretch>
         <el-tab-pane label="属性" name="properties">
           <el-form label-position="top" size="small">
