@@ -27,7 +27,7 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 2. 后端校验名称、节点、参数、端口、必填输入、重复边和 DAG。
 3. Compiler 把 node ID 规范化为安全且唯一的 Argo task 名。
 4. Edge 变成 task dependency 和 `{{tasks.<task>.outputs.parameters.<port>}}` 引用。
-5. 每个 task 只引用 `pipeline-demo-nodes` 中映射的 template，并附带运行/节点映射标签、12 位 Pipeline 定义摘要或注解。
+5. 每个 task 只引用 `pipeline-demo-nodes` 中映射的 template；Workflow metadata 保存节点映射、Pipeline 版本、12 位定义摘要和完整定义快照。快照只用于这个小型 PoC 的历史恢复，不是生产存储方案。
 6. Kubernetes API 在 `pipeline-demo` 创建 Workflow；Argo controller 创建 Pod。
 7. 后端把 Argo phase 映射为统一状态，解析节点/Pod/重试次数与 output parameters。
 
@@ -38,6 +38,8 @@ WorkflowTemplate 固定镜像和命令，DSL 只选择已注册节点并填写�
 ## 状态、日志和输出链路
 
 前端运行期间每 2 秒请求 run detail。后端从 Workflow `status.phase` 和 `status.nodes` 映射 `PENDING/RUNNING/SUCCEEDED/FAILED/ERROR/CANCELLED/SKIPPED`。点击节点后，后端用 Workflow 名和 node ID 映射到 task/Pod，通过 Pod Log API读取完整日志，并从 Argo node outputs 返回小型 JSON。
+
+浏览器原型以 Pipeline 名称和递增版本保存不可变定义；打开旧版本后再次保存会产生新的最高版本，不覆盖历史。运行始终绑定一个已保存版本，后端从 Workflow annotation 返回当时的完整定义，因此本地版本被删除后仍能恢复运行画布。正式集成时应以 `PipelineRepository` 替换 localStorage，并把定义快照迁移到平台元数据存储；不能把大定义长期塞入 Kubernetes annotation。
 
 顶部“停止”调用对整个 Workflow 的 `shutdown: Terminate` patch。终态后重复停止返回幂等结果，不删除 Workflow。
 

@@ -8,6 +8,7 @@ class Metadata(BaseModel):
     experimentName: str = "model-qualification"
     scenario: str = "training-evaluation-admission"
     tags: list[str] = Field(default_factory=list, max_length=10)
+    version: int | None = Field(default=None, ge=1)
 
 
 class PipelineNode(BaseModel):

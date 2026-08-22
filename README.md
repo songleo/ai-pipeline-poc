@@ -54,11 +54,11 @@ npm run dev
 
 镜像构建默认使用清华 PyPI 与 npmmirror，不修改系统全局配置；可通过 `PIP_INDEX_URL` 和 `NPM_REGISTRY` 为单次命令覆盖。后端本地开发也可使用：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e '.[dev]'`。
 
-前端开发服务器把 `/api` 代理到 `localhost:8000`。Pipeline 列表和版本在 PoC 阶段保存到浏览器 localStorage；正式集成时应替换为平台存储适配器。Node Registry 只由后端维护，前端动态生成组件库、类型化端口和参数表单。
+前端开发服务器把 `/api` 代理到 `localhost:8000`。Pipeline 列表和不可变版本历史在 PoC 阶段保存到浏览器 localStorage；正式集成时应替换为平台存储适配器。每次运行把版本号、定义摘要和完整 Pipeline 定义快照保存在 Workflow metadata 中，因此删除浏览器里的 Pipeline 后仍可从运行记录恢复当时 DAG。Node Registry 只由后端维护，前端动态生成组件库、类型化端口和参数表单。
 
 ## 演示与测试
 
-在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，然后点击“校验”和“运行”。编辑器支持节点删除、关联连线清理、整画布清空、撤销/重做、自动布局、全屏和左右面板折叠；校验问题可以定位到节点。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
+在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，或创建一个干净演示副本，然后点击“校验”和“运行”。编辑器支持节点删除、关联连线清理、整画布清空、撤销/重做、自动布局、全屏和左右面板折叠；连线展示 Artifact 类型或条件分支语义，校验问题可以定位到节点。列表可查看不可变版本历史、打开任一版本和删除整个本地 Pipeline。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
 
 ```bash
 make test

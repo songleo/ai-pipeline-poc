@@ -23,6 +23,10 @@ const registry = [
   definition('deployment-handoff', [port('registeredModel', 'RegisteredModelRef'), port('inferenceTest', 'InferenceTestRef')], [port('deploymentRequest', 'DeploymentRequestRef')]),
   definition('qualification-report', [port('decision', 'GateDecisionRef')], [port('report', 'ReportRef')]),
 ]
+registry.find(item => item.type === 'model-admission-gate')!.branchConditions = {
+  approvedCandidate: { output: 'decision', value: 'APPROVED' },
+  rejectedCandidate: { output: 'decision', value: 'REJECTED' },
+}
 
 describe('Pipeline DSL tools', () => {
   it('appends a dropped node with a new array reference', () => {
@@ -37,8 +41,9 @@ describe('Pipeline DSL tools', () => {
     nodes = appendFlowNode(nodes, registry[0], { x: 100, y: 100 }, 'dataset')
     nodes = appendFlowNode(nodes, registry[1], { x: 360, y: 100 }, 'profile')
     const result = connectFlowNodes(nodes, [], { source: 'dataset', sourceHandle: 'dataset', target: 'profile', targetHandle: 'dataset' })
-    const pipeline = flowToPipeline('connected-pipeline', '资格实验', ['p0'], nodes, result.edges)
-    expect(pipeline.metadata).toMatchObject({ experimentName: '资格实验', tags: ['p0'] })
+    const pipeline = flowToPipeline('connected-pipeline', '资格实验', ['p0'], nodes, result.edges, 300, 4)
+    expect(pipeline.metadata).toMatchObject({ experimentName: '资格实验', tags: ['p0'], version: 4 })
+    expect(result.edges[0].label).toBe('dataset · DatasetRef')
     expect(pipeline.spec.edges).toEqual([{ source: 'dataset', sourcePort: 'dataset', target: 'profile', targetPort: 'dataset' }])
   })
 
@@ -74,6 +79,7 @@ describe('Pipeline DSL tools', () => {
     const result = flowToPipeline(examplePipeline.metadata.name, examplePipeline.metadata.experimentName, examplePipeline.metadata.tags, flow.nodes, flow.edges, 420)
     expect(result.spec.nodes.map(item => item.id)).toEqual(examplePipeline.spec.nodes.map(item => item.id))
     expect(result.uiLayout.nodes['train-baseline']).toEqual({ x: 930, y: 90 })
+    expect(flow.edges.find(edge => edge.source === 'admission' && edge.sourceHandle === 'approvedCandidate')?.label).toBe('approvedCandidate · 通过')
   })
 
   it('detects a frontend port type mismatch', () => {

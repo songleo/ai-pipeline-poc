@@ -293,3 +293,37 @@ Kind 部署与真实执行：
 - 成功运行详情显示 Accuracy/F1/延迟、三项准入检查、`Accuracy +0.0350 / F1 +0.0375` 候选增益和部署交接 READY。
 
 浏览器回归没有代用户确认执行删除/清空动作，因此不能把确认后的页面删除动画记为浏览器通过；删除、关联连线清理和清空的数据行为由 13 项前端单元测试覆盖。当前实际页面地址 `http://localhost:5173`。
+
+## 2026-08-22 展示去环境化、版本闭环与历史恢复
+
+本轮保持独立 PoC 边界，没有接入 `ai-platform`。面向演示的页面删除了 Kind、直连和“未来接入”等环境实现字样；开发脚本和验证文档仍保留 Kind，因为它只是本地部署方式。Pipeline 列表现在只展示每个 Pipeline 的最新版本，并提供不可变版本历史、打开旧版本、复制、运行记录和删除全部本地版本。运行前若定义尚未保存会先生成版本；Workflow metadata 保存版本号、12 位摘要和完整小型定义快照，历史运行优先使用快照恢复 DAG。
+
+画布连线新增语义标签：普通连线显示端口与 Artifact 类型，受控门禁显示“通过/拒绝”。内置模板可以一键创建干净演示副本。Pipeline 删除仍有二次确认，删除本地版本不会删除 Workflow 运行记录及其快照。
+
+静态验证：
+
+```text
+frontend Vitest: 3 files, 15 tests passed
+frontend vue-tsc: passed
+frontend production build: passed, 1594 modules transformed
+backend pytest: 32 passed
+bash -n scripts/*.sh: passed
+```
+
+首次从仓库根目录运行 npm 失败，因为根目录没有 `package.json`；改在 `frontend/` 后通过。Windows 没有可用 `python` 命令，后端测试改用仓库既有 WSL venv。首次镜像构建访问清华 PyPI 镜像时连接被拒绝；后端 Dockerfile 调整为先安装锁定依赖再复制源码，随后使用官方 PyPI 完成构建。该调整也让后续只修改源码时可以复用依赖层。
+
+Kind 部署与 API smoke：
+
+- 当前 Context 明确为 `kind-pipeline-demo`；`pipeline-demo-backend`、`pipeline-demo-frontend` 均滚动更新成功且为 `1/1 Available`。
+- 后端镜像 `sha256:a3eff4bd49d6d9f2589cc8685ddf48680535a14e64d011a114123c258f988c68`，最终前端镜像 `sha256:b0b1b9b437a84c1f22aa176b9183a01955c97c49a3057d3f913d76b3edcb5d20`。
+- `scripts/smoke-test.sh` 退出码 0：主链 `comment-classification-demo-8vhbb` 成功且返回可恢复定义快照；拒绝链 `training-qualification-rejected-77xx5` 成功并正确跳过未准入节点；固定失败 `comment-classification-demo-vwtsq` 按预期失败；手动停止 `comment-classification-demo-j6sbx` 为已取消。
+
+Chrome 实际端到端回归：
+
+- 新建空白 Pipeline `pipeline-34428`，从组件库实际拖入“选择数据集版本”和“数据画像”两个节点；兼容端口连接成功，画布显示 `dataset · DatasetRef`，不兼容与重复输入仍由既有校验保护。
+- 连续保存得到可独立打开的 v1、v2；版本历史同时显示两个版本，列表只展示最新 v2。
+- v2 提交为 `pipeline-34428-cpbzw`，定义摘要 `2e11a39303bc`，2/2 节点均成功。
+- 第一次点击历史详情暴露 `DataCloneError`：API 返回的定义进入 Vue 响应式代理后不能直接 `structuredClone`。改用 Pipeline JSON 契约克隆并新增代理对象单测，重新部署后从运行记录恢复出 2 个节点、1 条连线、v2、同一摘要和完整运行结果。
+- 打开 15 节点模板后共显示 19 条语义连线；实际可见 `approvedDataset · 通过`、`approvedCandidate · 通过`、`approvedDecision · 通过` 和 `rejectedDecision · 拒绝`。
+
+浏览器中没有实际确认删除已保存 Pipeline，以避免清除用户 Chrome 中已有的本地演示数据；删除全部版本及存储更新由前端单元测试覆盖。可访问地址仍为 `http://localhost:5173`。

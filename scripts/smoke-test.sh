@@ -50,6 +50,8 @@ run="$(wait_for_status "$workflow" SUCCEEDED 360)"
 python3 - "$run" <<'PY'
 import json,sys
 r=json.loads(sys.argv[1]); nodes={n['nodeId']:n for n in r['nodes']}
+assert r['pipelineDefinition']['metadata']['name']=='comment-classification-demo'
+assert r['definitionDigest'] and len(r['definitionDigest'])==12
 a,b=nodes['train-baseline'],nodes['train-candidate']
 assert a['startedAt'] < b['finishedAt'] and b['startedAt'] < a['finishedAt'], 'training intervals did not overlap'
 assert nodes['register']['status']=='SUCCEEDED'
@@ -123,4 +125,4 @@ wait_for_status "$stopped_workflow" RUNNING 90 >/dev/null
 curl -fsS -X POST "$API_URL/api/runs/$stopped_workflow/stop" | grep -q 'CANCELLED'
 wait_for_status "$stopped_workflow" CANCELLED 90 >/dev/null
 
-echo "Smoke test passed: health, registry, validation, approved/rejected gates, parallel training, inference smoke, deployment handoff, logs, retries, and manual stop."
+echo "Smoke test passed: health, registry, validation, recoverable definition snapshot, approved/rejected gates, parallel training, inference smoke, deployment handoff, logs, retries, and manual stop."

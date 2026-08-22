@@ -57,6 +57,21 @@ def _outputs(node: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _json_annotation(annotations: dict[str, str], key: str, fallback: Any) -> Any:
+    try:
+        return json.loads(annotations.get(key, ""))
+    except (TypeError, json.JSONDecodeError):
+        return fallback
+
+
+def _positive_int_annotation(annotations: dict[str, str], key: str) -> int | None:
+    try:
+        value = int(annotations.get(key, "0"))
+        return value if value > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _pod_name_matches(pod_name: str, argo_node_id: str | None) -> bool:
     if not argo_node_id:
         return False
@@ -67,7 +82,8 @@ def _pod_name_matches(pod_name: str, argo_node_id: str | None) -> bool:
 
 def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
     metadata, spec, status = workflow.get("metadata", {}), workflow.get("spec", {}), workflow.get("status", {})
-    mapping = json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/node-map", "{}"))
+    annotations = metadata.get("annotations", {})
+    mapping = _json_annotation(annotations, "demo.pipeline.io/node-map", {})
     controls = _node_controls(workflow)
     workflow_status = map_phase(status.get("phase"), status.get("message", ""), spec.get("shutdown"))
     statuses: dict[str, dict[str, Any]] = status.get("nodes", {}) or {}
@@ -98,10 +114,12 @@ def workflow_detail(workflow: dict[str, Any]) -> dict[str, Any]:
     return {
         "workflowName": metadata.get("name"),
         "pipelineName": metadata.get("labels", {}).get("demo.pipeline.io/pipeline"),
-        "experimentName": metadata.get("annotations", {}).get("demo.pipeline.io/experiment"),
-        "scenario": metadata.get("annotations", {}).get("demo.pipeline.io/scenario"),
-        "tags": json.loads(metadata.get("annotations", {}).get("demo.pipeline.io/tags", "[]")),
-        "definitionDigest": metadata.get("annotations", {}).get("demo.pipeline.io/definition-digest"),
+        "experimentName": annotations.get("demo.pipeline.io/experiment"),
+        "scenario": annotations.get("demo.pipeline.io/scenario"),
+        "tags": _json_annotation(annotations, "demo.pipeline.io/tags", []),
+        "definitionVersion": _positive_int_annotation(annotations, "demo.pipeline.io/pipeline-version"),
+        "definitionDigest": annotations.get("demo.pipeline.io/definition-digest"),
+        "pipelineDefinition": _json_annotation(annotations, "demo.pipeline.io/definition-snapshot", None),
         "status": workflow_status,
         "startedAt": status.get("startedAt"), "finishedAt": status.get("finishedAt"),
         "message": status.get("message"), "nodes": result_nodes,

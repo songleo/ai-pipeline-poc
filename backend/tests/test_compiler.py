@@ -25,6 +25,9 @@ def test_compiles_professional_workflow_metadata() -> None:
     assert workflow["metadata"]["annotations"]["demo.pipeline.io/experiment"] == "小林的 AI 评论分类项目"
     assert json.loads(workflow["metadata"]["annotations"]["demo.pipeline.io/tags"]) == ["poc", "nlp", "comment-classification"]
     assert len(workflow["metadata"]["annotations"]["demo.pipeline.io/definition-digest"]) == 12
+    snapshot = Pipeline.model_validate_json(workflow["metadata"]["annotations"]["demo.pipeline.io/definition-snapshot"])
+    assert snapshot.metadata.name == "comment-classification-demo"
+    assert workflow["metadata"]["annotations"]["demo.pipeline.io/pipeline-version"] == "0"
 
 
 def test_parallel_training_evaluation_and_fan_in() -> None:

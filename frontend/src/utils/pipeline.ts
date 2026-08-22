@@ -46,7 +46,9 @@ export function connectFlowNodes(
   if (!input.multiple && edges.some(edge => edge.target === connection.target && edge.targetHandle === connection.targetHandle)) {
     return { edges, error: '该输入端口只能连接一次' }
   }
-  return { edges: addEdge(connection, [...edges]) as Edge[] }
+  const condition = source?.data?.definition.branchConditions?.[connection.sourceHandle ?? '']
+  const semanticLabel = condition ? `${connection.sourceHandle} · ${condition.value === 'APPROVED' ? '通过' : '拒绝'}` : `${output.name} · ${output.type}`
+  return { edges: addEdge({ ...connection, label: semanticLabel, labelBgPadding: [7, 4], labelBgBorderRadius: 4 }, [...edges]) as Edge[] }
 }
 
 export function removeFlowNode(nodes: Node<PipelineNodeData>[], edges: Edge[], nodeId: string): FlowMutationResult {
@@ -102,13 +104,21 @@ export function pipelineToFlow(pipeline: Pipeline, registry: NodeTypeDefinition[
       id: node.id, type: 'pipeline', position: pipeline.uiLayout.nodes[node.id] ?? { x: 0, y: 0 },
       data: { definition: definitions.get(node.type)!, pipelineNode: structuredClone(node), status: 'IDLE' },
     })),
-    edges: pipeline.spec.edges.map((edge, index) => ({ id: `e-${index}-${edge.source}-${edge.target}`, source: edge.source, sourceHandle: edge.sourcePort, target: edge.target, targetHandle: edge.targetPort, animated: false })),
+    edges: pipeline.spec.edges.map((edge, index) => {
+      const source = pipeline.spec.nodes.find(item => item.id === edge.source)
+      const definition = source ? definitions.get(source.type) : undefined
+      const output = definition?.outputPorts.find(item => item.name === edge.sourcePort)
+      const condition = definition?.branchConditions?.[edge.sourcePort]
+      return { id: `e-${index}-${edge.source}-${edge.target}`, source: edge.source, sourceHandle: edge.sourcePort, target: edge.target, targetHandle: edge.targetPort, animated: false,
+        label: condition ? `${edge.sourcePort} · ${condition.value === 'APPROVED' ? '通过' : '拒绝'}` : `${edge.sourcePort} · ${output?.type ?? 'Artifact'}`,
+        labelBgPadding: [7, 4] as [number, number], labelBgBorderRadius: 4 }
+    }),
   }
 }
 
-export function flowToPipeline(name: string, experimentName: string, tags: string[], nodes: Node<PipelineNodeData>[], edges: Edge[], timeoutSeconds = 300): Pipeline {
+export function flowToPipeline(name: string, experimentName: string, tags: string[], nodes: Node<PipelineNodeData>[], edges: Edge[], timeoutSeconds = 300, version?: number): Pipeline {
   return {
-    apiVersion: 'demo.pipeline.io/v1alpha1', kind: 'Pipeline', metadata: { name, experimentName, scenario: 'training-evaluation-admission', tags },
+    apiVersion: 'demo.pipeline.io/v1alpha1', kind: 'Pipeline', metadata: { name, experimentName, scenario: 'training-evaluation-admission', tags, ...(version ? { version } : {}) },
     spec: {
       nodes: nodes.map(node => JSON.parse(JSON.stringify(node.data!.pipelineNode)) as PipelineNode),
       edges: edges.map(edge => ({ source: edge.source, sourcePort: edge.sourceHandle ?? '', target: edge.target, targetPort: edge.targetHandle ?? '' })),

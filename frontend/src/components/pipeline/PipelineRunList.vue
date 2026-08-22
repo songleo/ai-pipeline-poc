@@ -19,7 +19,7 @@ function tagType(value: UnifiedStatus) { return value === 'SUCCEEDED' ? 'success
 
 <template>
   <section class="catalog-page">
-    <div class="page-title-row"><div><el-button link @click="emit('back')">← 返回 Pipeline</el-button><h1>运行记录</h1><p>{{ filter ? `Pipeline：${filter}` : '当前 Kind 环境中的受控 Pipeline 运行' }}</p></div></div>
+    <div class="page-title-row"><div><el-button link @click="emit('back')">← 返回 Pipeline</el-button><h1>运行记录</h1><p>{{ filter ? `Pipeline：${filter}` : '查看每次运行绑定的定义版本、状态和结果' }}</p></div></div>
     <div class="run-filters">
       <el-input v-model="query" clearable placeholder="搜索 Run ID、Pipeline 或实验" />
       <el-select v-model="status" placeholder="全部状态" clearable><el-option v-for="item in ['RUNNING','SUCCEEDED','FAILED','ERROR','CANCELLED']" :key="item" :label="statusLabel(item as UnifiedStatus)" :value="item" /></el-select>
@@ -32,7 +32,7 @@ function tagType(value: UnifiedStatus) { return value === 'SUCCEEDED' ? 'success
       <el-table-column label="状态" width="120"><template #default="scope"><el-tag :type="tagType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag></template></el-table-column>
       <el-table-column label="开始时间" width="190"><template #default="scope">{{ displayTime(scope.row.startedAt) }}</template></el-table-column>
       <el-table-column label="运行时长" width="100"><template #default="scope">{{ duration(scope.row) }}</template></el-table-column>
-      <el-table-column label="定义快照" width="120"><template #default="scope"><code>{{ scope.row.definitionDigest || '历史记录' }}</code></template></el-table-column>
+      <el-table-column label="定义版本" width="150"><template #default="scope"><strong v-if="scope.row.definitionVersion">v{{ scope.row.definitionVersion }}</strong><span v-else>历史版本</span><code class="run-digest">{{ scope.row.definitionDigest || '-' }}</code></template></el-table-column>
       <el-table-column label="操作" width="100"><template #default="scope"><el-button link type="primary" @click="emit('open', scope.row)">查看详情</el-button></template></el-table-column>
     </el-table>
   </section>
