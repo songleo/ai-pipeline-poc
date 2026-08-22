@@ -327,3 +327,37 @@ Chrome 实际端到端回归：
 - 打开 15 节点模板后共显示 19 条语义连线；实际可见 `approvedDataset · 通过`、`approvedCandidate · 通过`、`approvedDecision · 通过` 和 `rejectedDecision · 拒绝`。
 
 浏览器中没有实际确认删除已保存 Pipeline，以避免清除用户 Chrome 中已有的本地演示数据；删除全部版本及存储更新由前端单元测试覆盖。可访问地址仍为 `http://localhost:5173`。
+
+## 2026-08-22 新手演示精简
+
+本轮把第一版演示收敛为“选择数据集 → 数据预处理 → 模型训练 → 模型评测”4 步主路径。模型评测同时需要模型和预处理数据，因此正确 DAG 为 4 个节点、4 条连线。后端 Registry 为节点增加 `basic/advanced` 展示级别，默认组件库只显示 4 个基础组件，其余 8 个专业组件折叠；原 15 节点训练—评测—准入示例保留为第二入口。简单运行概览只显示状态、时间、Accuracy、F1、延迟与模型输出，高级 Artifact 存在时才显示门禁、排行榜、交接和 Lineage。
+
+静态与契约验证：
+
+```text
+frontend Vitest: 3 files, 17 tests passed
+frontend vue-tsc: passed
+frontend production build: passed, 1594 modules transformed
+backend pytest: 34 passed
+bash -n scripts/*.sh: passed
+examples/beginner-training-pipeline.json JSON parse: passed
+git diff --check: passed（仅 README.md CRLF 转换提示）
+legacy keyword tracked-file scan: no matches
+```
+
+Kind 部署与 API 回归：
+
+- 当前 Context 明确为 `kind-pipeline-demo`；重新构建并加载后端镜像 `sha256:19d90c4bb9f8edad8d8df2c3e4ca5547518092fd5647c1eb737afd3de688cf08`、前端镜像 `sha256:26cae3c72cfd31654c34aeb53f0fab469fb0a3a913c9f5c477d70474e4dba62f`，显式滚动重启后两个 Deployment 均为 `1/1 Available`。
+- `/api/health` 返回 `status=ok`；Registry 返回 12 个节点，其中基础节点正好为 `dataset-version, feature-preprocess, train-model, evaluate-model`；入门 JSON 的前后端校验均通过。
+- API 直接运行 `beginner-training-demo-lhvdw`，4/4 节点 `SUCCEEDED`；结果为 Accuracy `0.89`、F1 `0.845`、延迟 `36 ms`、模型 `xgboost`。
+- 完整 `scripts/smoke-test.sh` 退出码 0：专业主链 `comment-classification-demo-27mbm` 成功；拒绝链 `training-qualification-rejected-pbxrh` 成功；固定失败链 `comment-classification-demo-k7ldr` 按预期失败；手动停止链 `comment-classification-demo-j7smp` 按预期取消。
+
+Chrome 实际端到端回归：
+
+- 首页第一张卡片为“新手入门：基础模型训练 Pipeline”并标记“新手推荐”，第二张卡片为“专业示例”；新手卡片显示 4 步摘要。
+- 新建空白 Pipeline `pipeline-12706`，实际从默认组件库拖入“选择数据集版本”和“特征预处理”，点击类型化端口完成连线，画布显示 `dataset · DatasetRef`。默认只显示 4 个基础组件，入口显示“高级组件 · 8”。
+- 从新手模板创建副本 `beginner-training-demo-copy-86588`，校验通过并保存为 v1；浏览器提交 Workflow `beginner-training-demo-copy-86588-4257c`，定义摘要 `a3781e9d59a3`，4/4 节点成功。
+- 简单结果页显示 Accuracy `0.89`、F1 `0.845`、延迟 `36 ms` 和模型输出 `xgboost / model-18da16164f`，没有空门禁、空排行榜或 Lineage 区域。
+- 运行记录将上述运行显示为最新业务运行；点击详情后恢复 4 节点 DAG、v1、同一摘要和相同评测结果。
+
+已知构建提示：前端产物主 chunk 约 1.23 MB，Vite 给出大 chunk 警告，不影响本轮 PoC 验证；前端 Dockerfile 在源码变化后重新执行 npm 依赖层，本次网络安装约 5 分钟，后续可单独优化缓存顺序。

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { NodeTypeDefinition, PortDefinition } from '../types/pipeline'
-import { examplePipeline } from './example'
+import { beginnerPipeline, examplePipeline } from './example'
 import { appendFlowNode, autoLayoutFlow, clearFlow, connectFlowNodes, flowToPipeline, pipelineToFlow, removeFlowNode, terminalStatuses, validateLocally } from './pipeline'
 
 const port = (name: string, type: string): PortDefinition => ({ name, type, required: true, multiple: false })
 const definition = (type: string, inputs: PortDefinition[], outputs: PortDefinition[]): NodeTypeDefinition => ({
-  type, version: '1.0.0', displayName: type, description: '', category: 'test',
+  type, version: '1.0.0', displayName: type, description: '', category: 'test', level: 'advanced',
   parametersSchema: { type: 'object', properties: {} }, uiSchema: {}, inputPorts: inputs, outputPorts: outputs,
   workflowTemplateName: 'pipeline-demo-nodes', templateName: type, defaultRetryLimit: 0, defaultTimeoutSeconds: 120,
 })
@@ -80,6 +80,13 @@ describe('Pipeline DSL tools', () => {
     expect(result.spec.nodes.map(item => item.id)).toEqual(examplePipeline.spec.nodes.map(item => item.id))
     expect(result.uiLayout.nodes['train-baseline']).toEqual({ x: 930, y: 90 })
     expect(flow.edges.find(edge => edge.source === 'admission' && edge.sourceHandle === 'approvedCandidate')?.label).toBe('approvedCandidate · 通过')
+  })
+
+  it('keeps the beginner sample small and locally valid', () => {
+    const flow = pipelineToFlow(beginnerPipeline, registry)
+    expect(flow.nodes.map(node => node.data?.pipelineNode.type)).toEqual(['dataset-version', 'feature-preprocess', 'train-model', 'evaluate-model'])
+    expect(flow.edges).toHaveLength(4)
+    expect(validateLocally(beginnerPipeline, registry).valid).toBe(true)
   })
 
   it('detects a frontend port type mismatch', () => {

@@ -9,6 +9,7 @@ from app.models.pipeline import Pipeline
 
 
 EXAMPLE = Path(__file__).parents[2] / "examples" / "training-qualification-pipeline.json"
+BEGINNER_EXAMPLE = Path(__file__).parents[2] / "examples" / "beginner-training-pipeline.json"
 
 
 def data() -> dict:
@@ -24,6 +25,14 @@ def test_valid_dag() -> None:
     result = validate_pipeline(Pipeline.model_validate(data()))
     assert result.valid
     assert result.errors == []
+
+
+def test_beginner_example_is_a_valid_four_node_dag() -> None:
+    value = json.loads(BEGINNER_EXAMPLE.read_text(encoding="utf-8"))
+    result = validate_pipeline(Pipeline.model_validate(value))
+    assert result.valid
+    assert len(value["spec"]["nodes"]) == 4
+    assert len(value["spec"]["edges"]) == 4
 
 
 def test_cycle_detection() -> None:

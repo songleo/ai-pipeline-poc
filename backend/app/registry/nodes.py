@@ -63,10 +63,11 @@ def node(
     properties: dict[str, Any], inputs: list[dict[str, Any]], outputs: list[dict[str, Any]],
     template: str, parameter_mapping: dict[str, str], input_mapping: dict[str, str] | None = None,
     *, retry: int = 0, branches: dict[str, dict[str, str]] | None = None,
+    level: str = "advanced",
 ) -> dict[str, Any]:
     result = {
         "type": node_type, "version": "1.0.0", "displayName": display_name,
-        "description": description, "category": category,
+        "description": description, "category": category, "level": level,
         "parametersSchema": schema(list(properties), properties) if properties else {"type": "object", "properties": {}, "additionalProperties": False},
         "uiSchema": {"order": list(properties), "fields": {name: deepcopy(PARAMETER_UI.get(name, {"label": name, "group": "其他"})) for name in properties}},
         "inputPorts": inputs, "outputPorts": outputs,
@@ -98,7 +99,8 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
          "classBalance": number(0.42), "durationSeconds": integer(1, 0, 60)},
         [], [port("dataset", "DatasetRef")], "dataset-version",
         {"datasetName": "dataset-name", "version": "version", "sampleCount": "sample-count",
-         "missingRate": "missing-rate", "classBalance": "class-balance", "durationSeconds": "duration-seconds"}),
+         "missingRate": "missing-rate", "classBalance": "class-balance", "durationSeconds": "duration-seconds"},
+        level="basic"),
     "data-profile": node(
         "data-profile", "数据画像", "生成样本规模、缺失率和类别平衡等质量摘要。", "数据",
         {"durationSeconds": integer(2, 0, 60)}, [port("dataset", "DatasetRef")], [port("profile", "DataProfileRef")],
@@ -115,7 +117,7 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         "feature-preprocess", "特征预处理", "模拟清洗、编码与标准化，并保留上游数据版本。", "数据",
         {"strategy": string("standardize", values=["standardize", "robust-scale", "one-hot"]), "durationSeconds": integer(2, 0, 60)},
         [port("dataset", "DatasetRef")], [port("processedDataset", "DatasetRef")], "feature-preprocess",
-        {"strategy": "strategy", "durationSeconds": "duration-seconds"}, {"dataset": "dataset"}),
+        {"strategy": "strategy", "durationSeconds": "duration-seconds"}, {"dataset": "dataset"}, level="basic"),
     "train-model": node(
         "train-model", "模型训练 / 微调", "模拟受控模型训练，记录算法、超参数和资源规格。", "训练",
         {"algorithm": string("xgboost", values=["xgboost", "lightgbm", "bert-base-chinese", "roberta-wwm-ext", "macbert-base"]), "epochs": integer(40, 1, 500),
@@ -125,13 +127,13 @@ NODE_TYPES: dict[str, dict[str, Any]] = {
         [port("dataset", "DatasetRef")], [port("model", "ModelRef")], "train-model",
         {"algorithm": "algorithm", "epochs": "epochs", "learningRate": "learning-rate", "resourceProfile": "resource-profile",
          "durationSeconds": "duration-seconds", "baseAccuracy": "base-accuracy", "baseF1": "base-f1",
-         "latencyMs": "latency-ms", "failMode": "fail-mode"}, {"dataset": "dataset"}, retry=2),
+         "latencyMs": "latency-ms", "failMode": "fail-mode"}, {"dataset": "dataset"}, retry=2, level="basic"),
     "evaluate-model": node(
         "evaluate-model", "模型评测", "在固定测试数据上生成 Accuracy、F1 和推理延迟。", "评测",
         {"accuracyAdjustment": number(0.01, -0.2, 0.2), "durationSeconds": integer(2, 0, 60)},
         [port("model", "ModelRef"), port("dataset", "DatasetRef")], [port("evaluation", "EvaluationRef")],
         "evaluate-model", {"accuracyAdjustment": "accuracy-adjustment", "durationSeconds": "duration-seconds"},
-        {"model": "model", "dataset": "dataset"}),
+        {"model": "model", "dataset": "dataset"}, level="basic"),
     "compare-evaluations": node(
         "compare-evaluations", "排行榜与候选选择", "汇聚两组评测结果，按 Accuracy 选择候选模型。", "评测", {},
         [port("evaluationA", "EvaluationRef"), port("evaluationB", "EvaluationRef")],

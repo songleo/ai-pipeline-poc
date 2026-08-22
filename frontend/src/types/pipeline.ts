@@ -4,7 +4,7 @@ export interface PortDefinition { name: string; type: string; required: boolean;
 export interface ParameterProperty { type: 'string' | 'integer' | 'number' | 'boolean'; default?: unknown; minimum?: number; maximum?: number; enum?: string[]; minLength?: number; maxLength?: number }
 export interface ParameterUi { label: string; group: string; unit?: string; help?: string; simulation?: boolean }
 export interface NodeTypeDefinition {
-  type: string; version: string; displayName: string; description: string; category: string
+  type: string; version: string; displayName: string; description: string; category: string; level: 'basic' | 'advanced'
   parametersSchema: { type: 'object'; required?: string[]; properties: Record<string, ParameterProperty> }
   uiSchema: { order?: string[]; fields?: Record<string, ParameterUi> }; inputPorts: PortDefinition[]; outputPorts: PortDefinition[]
   workflowTemplateName: string; templateName: string; defaultRetryLimit: number; defaultTimeoutSeconds: number
@@ -26,5 +26,5 @@ export interface RunNode {
 }
 export interface RunDetail { workflowName: string; pipelineName: string; experimentName?: string; scenario?: string; tags: string[]; definitionVersion?: number; definitionDigest?: string; pipelineDefinition?: Pipeline; status: UnifiedStatus; startedAt?: string; finishedAt?: string; message?: string; nodes: RunNode[] }
 export interface PipelineCatalogEntry {
-  id: string; name: string; description: string; version: number; source: 'template' | 'local'; updatedAt: string; pipeline: Pipeline
+  id: string; name: string; description: string; flowSummary?: string; recommended?: boolean; version: number; source: 'template' | 'local'; updatedAt: string; pipeline: Pipeline
 }

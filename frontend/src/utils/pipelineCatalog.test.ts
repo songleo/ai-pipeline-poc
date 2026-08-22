@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { examplePipeline } from './example'
+import { beginnerPipeline, examplePipeline } from './example'
 import { clonePipeline, copyCatalogEntry, deletePipeline, latestCatalogEntries, loadLocalCatalog, saveToCatalog, templateEntry, versionsForPipeline } from './pipelineCatalog'
 
 function memoryStorage() {
@@ -35,6 +35,14 @@ describe('Pipeline catalog', () => {
     expect(copied.metadata.name).toMatch(/^comment-classification-demo-copy-/)
     expect(copied.metadata.version).toBeUndefined()
     expect(entry.pipeline.metadata.name).toBe('comment-classification-demo')
+  })
+
+  it('exposes a four-node beginner template before advanced examples', () => {
+    const entry = templateEntry(beginnerPipeline, { recommended: true, flowSummary: '选择数据集 → 数据预处理 → 模型训练 → 模型评测' })
+    expect(entry.recommended).toBe(true)
+    expect(entry.pipeline.spec.nodes).toHaveLength(4)
+    expect(entry.pipeline.spec.edges).toHaveLength(4)
+    expect(entry.flowSummary).toContain('模型评测')
   })
 
   it('clones a reactive-looking definition through its JSON contract', () => {

@@ -1,0 +1,26 @@
+{
+  "apiVersion": "demo.pipeline.io/v1alpha1",
+  "kind": "Pipeline",
+  "metadata": {
+    "name": "beginner-training-demo",
+    "experimentName": "基础模型训练 Pipeline",
+    "scenario": "training-evaluation",
+    "tags": ["poc", "beginner"]
+  },
+  "spec": {
+    "nodes": [
+      {"id": "dataset", "type": "dataset-version", "version": "1.0.0", "name": "选择训练数据", "parameters": {"datasetName": "customer-churn", "version": "v2026.08", "sampleCount": 12000, "missingRate": 0.018, "classBalance": 0.42, "durationSeconds": 1}},
+      {"id": "preprocess", "type": "feature-preprocess", "version": "1.0.0", "name": "数据预处理", "parameters": {"strategy": "standardize", "durationSeconds": 1}},
+      {"id": "train", "type": "train-model", "version": "1.0.0", "name": "训练模型", "parameters": {"algorithm": "xgboost", "epochs": 40, "learningRate": 0.05, "resourceProfile": "cpu-small", "durationSeconds": 4, "baseAccuracy": 0.88, "baseF1": 0.84, "latencyMs": 36, "retryLimit": 2, "failMode": "never"}},
+      {"id": "evaluate", "type": "evaluate-model", "version": "1.0.0", "name": "评测模型", "parameters": {"accuracyAdjustment": 0.01, "durationSeconds": 1}}
+    ],
+    "edges": [
+      {"source": "dataset", "sourcePort": "dataset", "target": "preprocess", "targetPort": "dataset"},
+      {"source": "preprocess", "sourcePort": "processedDataset", "target": "train", "targetPort": "dataset"},
+      {"source": "train", "sourcePort": "model", "target": "evaluate", "targetPort": "model"},
+      {"source": "preprocess", "sourcePort": "processedDataset", "target": "evaluate", "targetPort": "dataset"}
+    ],
+    "runPolicy": {"timeoutSeconds": 180}
+  },
+  "uiLayout": {"nodes": {"dataset": {"x": 20, "y": 210}, "preprocess": {"x": 290, "y": 210}, "train": {"x": 560, "y": 110}, "evaluate": {"x": 830, "y": 210}}}
+}

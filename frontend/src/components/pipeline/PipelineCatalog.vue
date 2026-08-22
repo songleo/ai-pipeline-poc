@@ -25,8 +25,8 @@ function showVersions(entry: PipelineCatalogEntry) { versionPipeline.value = ent
     <div class="section-heading"><div><h2>业务模板</h2><p>从受控场景开始，避免用户提交任意镜像或脚本。</p></div></div>
     <div class="template-grid">
       <article v-for="entry in templates" :key="entry.id" class="template-card">
-        <div class="template-icon">ML</div><div class="template-body"><el-tag size="small" type="success">推荐演示</el-tag><h3>{{ entry.name }}</h3><p>{{ entry.description }}</p>
-        <div class="template-flow">已标注评论 → 微调 → 评测 → 准入 → 推理冒烟 → 部署交接</div>
+        <div class="template-icon">ML</div><div class="template-body"><el-tag size="small" :type="entry.recommended ? 'success' : 'info'">{{ entry.recommended ? '新手推荐' : '专业示例' }}</el-tag><h3>{{ entry.name }}</h3><p>{{ entry.description }}</p>
+        <div class="template-flow">{{ entry.flowSummary }}</div>
         <el-button type="primary" plain @click="emit('open', entry)">查看模板</el-button><el-button @click="emit('copy', entry)">创建演示副本</el-button></div>
       </article>
     </div>

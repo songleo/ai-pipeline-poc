@@ -1,6 +1,6 @@
 # pipeline-demo
 
-`pipeline-demo` 是一个通用、独立的可视化 AI Pipeline PoC；编辑器、Registry、DSL 和运行视图不绑定具体业务。内置的“小林的 AI 评论分类项目”只是一份业务模板，用来演示“数据 → 训练/微调 → 评测 → 准入 → 模型登记 → 推理冒烟 → 部署交接”闭环。它不接入 `ai-platform`，由 FastAPI 后端直接把受控 DSL 编译为 Argo Workflow，也不允许浏览器直接访问 Kubernetes。
+`pipeline-demo` 是一个通用、独立的可视化 AI Pipeline PoC；编辑器、Registry、DSL 和运行视图不绑定具体业务。首页默认提供 4 节点“基础模型训练 Pipeline”，专业的训练—评测—准入闭环作为进阶参考。它不接入 `ai-platform`，由 FastAPI 后端直接把受控 DSL 编译为 Argo Workflow，也不允许浏览器直接访问 Kubernetes。
 
 ## 架构简介
 
@@ -58,7 +58,7 @@ npm run dev
 
 ## 演示与测试
 
-在 Pipeline 列表页选择“小林的 AI 评论分类项目”模板，或创建一个干净演示副本，然后点击“校验”和“运行”。编辑器支持节点删除、关联连线清理、整画布清空、撤销/重做、自动布局、全屏和左右面板折叠；连线展示 Artifact 类型或条件分支语义，校验问题可以定位到节点。列表可查看不可变版本历史、打开任一版本和删除整个本地 Pipeline。默认示例包含 15 个可编排节点、两个受控条件门禁、并行微调/评测、模型排行榜、模拟推理和 `DeploymentRequestRef` 交接。详细步骤见 [5 分钟演示指南](docs/demo-guide.md)。
+在 Pipeline 列表页优先选择“新手入门：基础模型训练 Pipeline”，用选择数据、预处理、训练、评测 4 个组件完成首次演示。组件库默认只显示这 4 个基础组件；门禁、排行榜、登记、推理冒烟和部署交接等能力收在“高级组件”中。编辑器仍支持版本、历史恢复、删除、撤销/重做和自动布局；专业示例保留为第二入口。详细步骤见 [3 分钟演示指南](docs/demo-guide.md)。
 
 ```bash
 make test

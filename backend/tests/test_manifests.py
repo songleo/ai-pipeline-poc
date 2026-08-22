@@ -36,3 +36,9 @@ def test_registry_exposes_professional_parameter_presentation() -> None:
     assert fields["resourceProfile"]["group"] == "资源配置"
     assert fields["baseAccuracy"]["simulation"] is True
     assert "正式接入后" in fields["baseAccuracy"]["help"]
+
+
+def test_registry_marks_only_the_beginner_components_as_basic() -> None:
+    basic = {item["type"] for item in NODE_TYPES.values() if item["level"] == "basic"}
+    assert basic == {"dataset-version", "feature-preprocess", "train-model", "evaluate-model"}
+    assert all(item["level"] in {"basic", "advanced"} for item in NODE_TYPES.values())

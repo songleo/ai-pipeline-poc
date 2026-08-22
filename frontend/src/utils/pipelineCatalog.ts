@@ -5,13 +5,15 @@ type CatalogStorage = Pick<Storage, 'getItem' | 'setItem'>
 export interface SaveVersionResult { entries: PipelineCatalogEntry[]; entry: PipelineCatalogEntry }
 export function clonePipeline(pipeline: Pipeline): Pipeline { return JSON.parse(JSON.stringify(pipeline)) as Pipeline }
 
-export function templateEntry(pipeline: Pipeline): PipelineCatalogEntry {
+export function templateEntry(pipeline: Pipeline, options: { id?: string; name?: string; description?: string; flowSummary?: string; recommended?: boolean } = {}): PipelineCatalogEntry {
   const definition = clonePipeline(pipeline)
   definition.metadata.version = 1
   return {
-    id: 'template-training-qualification',
-    name: '小林的 AI 评论分类项目',
-    description: '一份使用通用 Pipeline 节点编排出的评论分类业务模板。',
+    id: options.id ?? `template-${pipeline.metadata.name}`,
+    name: options.name ?? pipeline.metadata.experimentName,
+    description: options.description ?? `${pipeline.spec.nodes.length} 个节点的内置 Pipeline 模板。`,
+    flowSummary: options.flowSummary,
+    recommended: options.recommended ?? false,
     version: 1,
     source: 'template',
     updatedAt: '内置模板',

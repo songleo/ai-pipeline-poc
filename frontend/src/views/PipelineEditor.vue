@@ -12,7 +12,7 @@ import PipelineCatalog from '../components/pipeline/PipelineCatalog.vue'
 import PipelineRunList from '../components/pipeline/PipelineRunList.vue'
 import PipelineNode from '../components/nodes/PipelineNode.vue'
 import type { NodeTypeDefinition, Pipeline, PipelineCatalogEntry, RunDetail, UnifiedStatus, ValidationIssue, ValidationResult } from '../types/pipeline'
-import { examplePipeline } from '../utils/example'
+import { beginnerPipeline, examplePipeline } from '../utils/example'
 import { clonePipeline, copyCatalogEntry, deletePipeline, loadLocalCatalog, saveToCatalog, templateEntry } from '../utils/pipelineCatalog'
 import { appendFlowNode, autoLayoutFlow, clearFlow, connectFlowNodes, flowToPipeline, pipelineToFlow, removeFlowNode, terminalStatuses, validateLocally, type PipelineNodeData } from '../utils/pipeline'
 
@@ -55,7 +55,19 @@ let pollTimer: ReturnType<typeof setInterval> | undefined
 
 const nodeTypes = { pipeline: markRaw(PipelineNode) } as unknown as NodeTypesObject
 const { fitView, screenToFlowCoordinate } = useVueFlow()
-const catalogEntries = computed(() => [templateEntry(examplePipeline), ...localEntries.value])
+const catalogEntries = computed(() => [
+  templateEntry(beginnerPipeline, {
+    id: 'template-beginner-training', name: '新手入门：基础模型训练 Pipeline', recommended: true,
+    description: '用 4 个基础组件完成拖拽、连线、运行和结果查看。',
+    flowSummary: '选择数据集 → 数据预处理 → 模型训练 → 模型评测',
+  }),
+  templateEntry(examplePipeline, {
+    id: 'template-training-qualification', name: '专业示例：训练—评测—准入闭环',
+    description: '包含质量门禁、双路训练、模型准入与部署交接的进阶参考。',
+    flowSummary: '数据质量 → 双路训练 → 排行榜 → 准入 → 交接',
+  }),
+  ...localEntries.value,
+])
 const selectedNode = computed(() => flowNodes.value.find(item => item.id === selectedId.value))
 const selectedRuntime = computed(() => runDetail.value?.nodes.find(item => item.nodeId === selectedId.value))
 const currentStatus = computed(() => runDetail.value?.status ?? 'IDLE')
@@ -72,6 +84,11 @@ const artifacts = computed(() => (runDetail.value?.nodes ?? []).flatMap(node => 
 const leaderboard = computed(() => artifacts.value.find(item => item.kind === 'LeaderboardRef')?.value.entries as Array<Record<string, unknown>> | undefined)
 const decisions = computed(() => artifacts.value.filter(item => item.kind === 'GateDecisionRef').filter((item, index, values) => values.findIndex(other => other.id === item.id) === index))
 const deploymentRequest = computed(() => artifacts.value.find(item => item.kind === 'DeploymentRequestRef')?.value)
+const evaluationResult = computed(() => artifacts.value.find(item => item.kind === 'EvaluationRef')?.value)
+const evaluationMetrics = computed(() => evaluationResult.value?.metrics as Record<string, number> | undefined)
+const evaluationModel = computed(() => evaluationResult.value?.model as Record<string, unknown> | undefined)
+const advancedArtifactKinds = new Set(['DataProfileRef', 'GateDecisionRef', 'CandidateModelRef', 'LeaderboardRef', 'RegisteredModelRef', 'InferenceTestRef', 'DeploymentRequestRef', 'ReportRef'])
+const hasAdvancedResults = computed(() => artifacts.value.some(item => advancedArtifactKinds.has(item.kind)))
 const admissionDecision = computed(() => decisions.value.find(item => item.value.gate === 'model-admission')?.value)
 const admissionChecks = computed(() => Object.entries((admissionDecision.value?.checks as Record<string, boolean> | undefined) ?? {}))
 const metricDelta = computed(() => {
@@ -131,7 +148,7 @@ async function loadPipeline(pipeline: Pipeline, mode: WorkspaceMode = 'edit') {
 async function openEntry(entry: PipelineCatalogEntry) { await loadPipeline(entry.pipeline) }
 async function copyEntry(entry: PipelineCatalogEntry) { await loadPipeline(copyCatalogEntry(entry)); ElMessage.success('已创建可编辑副本') }
 async function newPipeline() {
-  const pipeline = structuredClone(examplePipeline)
+  const pipeline = clonePipeline(beginnerPipeline)
   pipeline.metadata.name = `pipeline-${Date.now().toString().slice(-5)}`
   pipeline.metadata.experimentName = '新建 Pipeline'
   pipeline.metadata.scenario = 'custom-workflow'
@@ -309,11 +326,18 @@ onBeforeUnmount(stopPolling)
           <template v-else>
             <el-alert v-if="failedNode" type="error" :closable="false" show-icon><template #title>失败节点：{{ failedNode.nodeId }}</template><div>{{ failedNode.message || '请点击节点查看日志，并可从该节点重跑。' }}</div></el-alert>
             <el-descriptions :column="1" border size="small"><el-descriptions-item label="实验">{{ runDetail?.experimentName }}</el-descriptions-item><el-descriptions-item label="定义版本">{{ runDetail?.definitionVersion ? `v${runDetail.definitionVersion}` : '历史版本' }}</el-descriptions-item><el-descriptions-item label="定义摘要"><code>{{ runDetail?.definitionDigest || '历史运行未记录' }}</code></el-descriptions-item><el-descriptions-item label="状态">{{ currentStatus }}</el-descriptions-item><el-descriptions-item label="开始">{{ runDetail?.startedAt || '-' }}</el-descriptions-item><el-descriptions-item label="结束">{{ runDetail?.finishedAt || '-' }}</el-descriptions-item></el-descriptions>
-            <h4>业务门禁</h4><div v-for="item in decisions" :key="item.id" class="decision-card"><el-tag :type="item.value.outcome === 'APPROVED' ? 'success' : 'danger'">{{ item.value.outcome }}</el-tag><span>{{ item.value.gate }}</span></div>
-            <div v-if="admissionDecision" class="admission-reason"><strong>模型准入依据</strong><div v-for="([metric, passed]) in admissionChecks" :key="metric"><span>{{ metric }}</span><el-tag size="small" :type="passed ? 'success' : 'danger'">{{ passed ? '通过' : '未通过' }}</el-tag></div></div>
-            <h4>模型排行榜</h4><el-table v-if="leaderboard" :data="leaderboard" size="small"><el-table-column prop="rank" label="#" width="34" /><el-table-column prop="algorithm" label="模型" min-width="118" /><el-table-column prop="accuracy" label="Acc" width="55" /><el-table-column prop="f1" label="F1" width="55" /><el-table-column prop="latencyMs" label="ms" width="52" /></el-table><el-empty v-else description="尚未生成" :image-size="48" /><div v-if="metricDelta" class="metric-delta">候选相对基线：Accuracy {{ metricDelta.accuracy >= 0 ? '+' : '' }}{{ metricDelta.accuracy.toFixed(4) }}，F1 {{ metricDelta.f1 >= 0 ? '+' : '' }}{{ metricDelta.f1.toFixed(4) }}</div>
-            <div v-if="deploymentRequest" class="deployment-card"><el-tag type="success">READY</el-tag><strong>推理部署交接已就绪</strong><span>{{ deploymentRequest.id }}</span><small>{{ deploymentRequest.adapterContract }} · {{ deploymentRequest.executionMode }}</small></div>
-            <h4>Artifact Lineage</h4><div v-for="item in artifacts" :key="`${item.nodeId}-${item.port}`" class="artifact-card"><span class="artifact-kind">{{ item.kind }}</span><strong>{{ item.id }}</strong><small>{{ item.nodeId }} · {{ item.port }}</small></div>
+            <template v-if="evaluationMetrics">
+              <h4>模型评测结果</h4>
+              <div class="metric-grid"><div><span>Accuracy</span><strong>{{ evaluationMetrics.accuracy }}</strong></div><div><span>F1</span><strong>{{ evaluationMetrics.f1 }}</strong></div><div><span>延迟</span><strong>{{ evaluationMetrics.latencyMs }} ms</strong></div></div>
+              <div v-if="evaluationModel" class="model-result"><span>模型输出</span><strong>{{ evaluationModel.algorithm }}</strong><code>{{ evaluationModel.id }}</code></div>
+            </template>
+            <template v-if="hasAdvancedResults">
+              <template v-if="decisions.length"><h4>业务门禁</h4><div v-for="item in decisions" :key="item.id" class="decision-card"><el-tag :type="item.value.outcome === 'APPROVED' ? 'success' : 'danger'">{{ item.value.outcome }}</el-tag><span>{{ item.value.gate }}</span></div></template>
+              <div v-if="admissionDecision" class="admission-reason"><strong>模型准入依据</strong><div v-for="([metric, passed]) in admissionChecks" :key="metric"><span>{{ metric }}</span><el-tag size="small" :type="passed ? 'success' : 'danger'">{{ passed ? '通过' : '未通过' }}</el-tag></div></div>
+              <template v-if="leaderboard"><h4>模型排行榜</h4><el-table :data="leaderboard" size="small"><el-table-column prop="rank" label="#" width="34" /><el-table-column prop="algorithm" label="模型" min-width="118" /><el-table-column prop="accuracy" label="Acc" width="55" /><el-table-column prop="f1" label="F1" width="55" /><el-table-column prop="latencyMs" label="ms" width="52" /></el-table><div v-if="metricDelta" class="metric-delta">候选相对基线：Accuracy {{ metricDelta.accuracy >= 0 ? '+' : '' }}{{ metricDelta.accuracy.toFixed(4) }}，F1 {{ metricDelta.f1 >= 0 ? '+' : '' }}{{ metricDelta.f1.toFixed(4) }}</div></template>
+              <div v-if="deploymentRequest" class="deployment-card"><el-tag type="success">READY</el-tag><strong>推理部署交接已就绪</strong><span>{{ deploymentRequest.id }}</span><small>{{ deploymentRequest.adapterContract }} · {{ deploymentRequest.executionMode }}</small></div>
+              <h4>Artifact Lineage</h4><div v-for="item in artifacts" :key="`${item.nodeId}-${item.port}`" class="artifact-card"><span class="artifact-kind">{{ item.kind }}</span><strong>{{ item.id }}</strong><small>{{ item.nodeId }} · {{ item.port }}</small></div>
+            </template>
           </template>
         </aside>
       </main>
